@@ -73,7 +73,44 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS onboardings (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  franchise_name      TEXT NOT NULL,
+  contact_name        TEXT NOT NULL DEFAULT '',
+  phone               TEXT NOT NULL DEFAULT '',
+  plan                TEXT NOT NULL DEFAULT '',
+  owner               TEXT NOT NULL DEFAULT '',
+  stage               TEXT NOT NULL DEFAULT 'nova',
+  situacao            TEXT NOT NULL DEFAULT 'ativo',
+  notes               TEXT NOT NULL DEFAULT '',
+  origem              TEXT NOT NULL DEFAULT 'manual',
+  whatsapp_group_id   TEXT UNIQUE,
+  whatsapp_group_name TEXT NOT NULL DEFAULT '',
+  contact_id          INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  started_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  stage_changed_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  concluded_at        TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_tasks (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  onboarding_id  INTEGER NOT NULL REFERENCES onboardings(id) ON DELETE CASCADE,
+  task_key       TEXT NOT NULL,
+  title          TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'pendente',
+  note           TEXT NOT NULL DEFAULT '',
+  position       INTEGER NOT NULL DEFAULT 0,
+  done_at        TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (onboarding_id, task_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
+CREATE INDEX IF NOT EXISTS idx_onboardings_stage ON onboardings(stage);
+CREATE INDEX IF NOT EXISTS idx_onboarding_tasks ON onboarding_tasks(onboarding_id);
 CREATE INDEX IF NOT EXISTS idx_messages_received ON messages(received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activities_message ON activities(message_id);
 `);
@@ -105,8 +142,14 @@ CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
 // O antigo status "relevante" virou "escalada" (precisa de resposta humana).
 db.exec(`UPDATE messages SET status = 'escalada', needs_human = 1 WHERE status = 'relevante'`);
 
-export function log(kind, detail, { messageId = null, contactId = null, actor = 'sistema' } = {}) {
+// A tabela de atividades nasceu só para mensagens; agora também registra onboarding.
+if (!new Set(db.prepare(`PRAGMA table_info(activities)`).all().map((c) => c.name)).has('onboarding_id')) {
+  db.exec(`ALTER TABLE activities ADD COLUMN onboarding_id INTEGER REFERENCES onboardings(id) ON DELETE CASCADE`);
+}
+
+export function log(kind, detail, { messageId = null, contactId = null, onboardingId = null, actor = 'sistema' } = {}) {
   db.prepare(
-    `INSERT INTO activities (message_id, contact_id, kind, detail, actor) VALUES (?, ?, ?, ?, ?)`
-  ).run(messageId, contactId, kind, detail, actor);
+    `INSERT INTO activities (message_id, contact_id, onboarding_id, kind, detail, actor)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(messageId, contactId, onboardingId, kind, detail, actor);
 }

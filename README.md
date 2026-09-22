@@ -26,8 +26,9 @@ Variáveis de ambiente:
 | `CRM_TOKEN` | exige token nas chamadas do agente | vazio (sem token) |
 | `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
 | `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
+| `CRM_ONBOARDING_ALERTA_DIAS` | dias parado até sinalizar a franquia | `7` |
 
-## As três abas
+## As abas
 
 **Triagem de mensagens** é o coração do CRM, e já abre na fila do que o agente
 escalou. Cada card mostra a decisão do agente, a confiança, o motivo e, quando
@@ -39,6 +40,17 @@ respondeu sozinho e o que já foi resolvido.
 Além da decisão do agente, o CRM pontua cada mensagem de 0 a 100 e explica *por
 que* ela subiu ou desceu na fila, então mesmo que o agente fique fora do ar a
 ordem continua fazendo sentido.
+
+**Onboarding** é a esteira de implantação das franquias. Cada franquia é um card
+que anda pelas colunas, e as colunas são as tarefas: cadastro na OpenAI, criação
+de BM no Facebook, CTN e teste do agente de vendas. Dá para arrastar o card ou
+marcar as tarefas no detalhe, que as duas coisas se mantêm em acordo. Franquias
+paradas há muitos dias ou com tarefa travada ficam sinalizadas.
+
+Franquias entram na esteira pelo botão **Nova franquia** ou sozinhas, quando um
+grupo novo aparece no WhatsApp do CS. Essa entrada automática depende do provedor
+de WhatsApp que vocês forem usar, e o caminho está explicado em
+[`docs/ONBOARDING.md`](docs/ONBOARDING.md).
 
 **Contatos** guarda quem é quem: empresa, canais, etapa no funil, responsável e
 observações. Marcar alguém como cliente ativo faz as mensagens dessa pessoa
@@ -130,11 +142,14 @@ entra vinculada a ele.
 | `POST /api/contacts` | cria contato |
 | `GET/PATCH/DELETE /api/contacts/:id` | detalhe, edição e remoção |
 | `GET /api/dashboard` | indicadores agregados |
+| `GET/POST /api/onboarding` | esteira de onboarding, ver [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
+| `POST /api/onboarding/whatsapp-group` | abre a franquia a partir de um grupo novo do WhatsApp |
 
 ## Estrutura
 
 ```
 server/relevance.js   motor de pontuação das mensagens
+server/onboarding.js  esteira de implantação das franquias
 server/db.js          schema SQLite e log de atividades
 server/api.js         regras de negócio
 server/index.js       servidor HTTP e rotas
@@ -142,6 +157,7 @@ server/seed.js        dados de exemplo
 public/               interface web (HTML, CSS e JS puros)
 scripts/              agente de exemplo para testar a integração
 docs/AGENTE.md        contrato de integração com o agente
+docs/ONBOARDING.md    etapas da esteira e entrada pelo WhatsApp
 ```
 
 ## Antes de expor na internet

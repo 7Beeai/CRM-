@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { createContact, createMessage, applyAgentDecision, setHumanFeedback } from './api.js';
+import { createOnboarding, setTask, moveStage, fromWhatsappGroup } from './onboarding.js';
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3.6e6).toISOString().slice(0, 19).replace('T', ' ');
 
@@ -45,4 +46,33 @@ for (const d of decisoes) applyAgentDecision(criadas[d.i].id, { agent: 'agente-c
 setHumanFeedback(criadas[4].id, { feedback: 'acertou', actor: 'Guilherme' });
 setHumanFeedback(criadas[6].id, { feedback: 'acertou', actor: 'Guilherme' });
 
+// Esteira de onboarding
+const diasAtras = (d) => new Date(Date.now() - d * 8.64e7).toISOString().slice(0, 19).replace('T', ' ');
+
+const franquias = [
+  { franchise_name: 'Padaria Pão Quente', contact_name: 'Jose Martins', phone: '+5511970001111', plan: 'Aceleração em Agendamentos', started_at: diasAtras(2) },
+  { franchise_name: 'Auto Center Silva', contact_name: 'Denilson Silva', phone: '+5511970002222', plan: 'Aceleração em Agendamentos', started_at: diasAtras(9) },
+  { franchise_name: 'Clínica Sorriso', contact_name: 'Bruno Rocha', phone: '+5511970003333', plan: 'Mentoria Fórmula de Agendamento', started_at: diasAtras(16) },
+  { franchise_name: 'Estética Elaine', contact_name: 'Elaine Faria', phone: '+5511970004444', plan: 'Mentoria Fórmula de Agendamento', started_at: diasAtras(24) },
+  { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', plan: 'Programa de Implementação de Agendamentos', started_at: diasAtras(31) }
+];
+const abertas = franquias.map((f) => createOnboarding({ ...f, owner: 'Guilherme' }));
+
+// Uma franquia detectada automaticamente pelo grupo do WhatsApp.
+fromWhatsappGroup({
+  group_id: '120363000000000001@g.us',
+  group_name: '7Bee x Mercado Bom Preço',
+  contact_name: 'Patricia Nunes',
+  created_at: diasAtras(1)
+});
+
+setTask(abertas[1].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+setTask(abertas[2].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+setTask(abertas[2].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
+setTask(abertas[3].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+setTask(abertas[3].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
+setTask(abertas[3].id, 'ctn', { status: 'bloqueado', note: 'Esperando documento do franqueado.', actor: 'Guilherme' });
+moveStage(abertas[4].id, 'concluido', { actor: 'Guilherme' });
+
+console.log(`Onboarding: ${franquias.length + 1} franquias na esteira.`);
 console.log(`Seed concluído: ${contacts.length} contatos, ${messages.length} mensagens e ${decisoes.length} decisões do agente.`);

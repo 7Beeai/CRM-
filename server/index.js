@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as api from './api.js';
+import * as onb from './onboarding.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = join(root, 'public');
@@ -80,6 +81,38 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/health') return send(res, 200, { ok: true });
+    if (pathname === '/api/onboarding/meta' && req.method === 'GET') return send(res, 200, onb.onboardingMeta);
+    if (pathname === '/api/onboarding/stats' && req.method === 'GET') return send(res, 200, onb.onboardingStats());
+
+    if (pathname === '/api/onboarding') {
+      if (req.method === 'GET') return send(res, 200, onb.listOnboardings(q));
+      if (req.method === 'POST') return send(res, 201, onb.createOnboarding(await readJson(req)));
+    }
+
+    // Entrada automática: um grupo novo no WhatsApp do CS vira um onboarding.
+    if (pathname === '/api/onboarding/whatsapp-group' && req.method === 'POST') {
+      if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
+      return send(res, 201, onb.fromWhatsappGroup(await readJson(req)));
+    }
+
+    const onbMatch = pathname.match(/^\/api\/onboarding\/(\d+)(?:\/(stage|activities|tasks\/[a-z_]+))?$/);
+    if (onbMatch) {
+      const id = Number(onbMatch[1]);
+      const sub = onbMatch[2];
+      if (sub === 'stage' && req.method === 'POST') {
+        const body = await readJson(req);
+        return send(res, 200, onb.moveStage(id, body.stage, { actor: body.actor ?? 'Guilherme' }));
+      }
+      if (sub === 'activities' && req.method === 'GET') return send(res, 200, onb.onboardingActivities(id));
+      if (sub?.startsWith('tasks/') && req.method === 'PATCH') {
+        return send(res, 200, onb.setTask(id, sub.slice(6), await readJson(req)));
+      }
+      if (!sub) {
+        if (req.method === 'GET') return send(res, 200, onb.getOnboarding(id));
+        if (req.method === 'PATCH') return send(res, 200, onb.updateOnboarding(id, await readJson(req)));
+        if (req.method === 'DELETE') return send(res, 200, onb.deleteOnboarding(id));
+      }
+    }
     if (pathname === '/api/meta' && req.method === 'GET') return send(res, 200, api.meta);
     if (pathname === '/api/dashboard' && req.method === 'GET') return send(res, 200, api.dashboard());
 

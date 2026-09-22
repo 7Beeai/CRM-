@@ -325,6 +325,251 @@ function contactFields(c = {}) {
   ];
 }
 
+/* -------------------------------- onboarding ------------------------------- */
+
+const onb = { stages: [], filtros: { q: '', situacao: 'ativo' } };
+
+async function carregarEtapas() {
+  if (onb.stages.length) return onb.stages;
+  const meta = await apiCall('/onboarding/meta');
+  onb.stages = meta.STAGES;
+  return onb.stages;
+}
+
+function iniciais(nome) {
+  const partes = nome.trim().split(/\s+/).slice(0, 2);
+  return partes.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
+}
+
+function onbCard(o) {
+  const progresso = o.total_tarefas ? Math.round((o.tarefas_feitas / o.total_tarefas) * 100) : 0;
+  const etapaAtual = onb.stages.findIndex((s) => s.key === o.stage);
+  const proxima = onb.stages[etapaAtual + 1];
+  const tags = [];
+  if (o.origem === 'whatsapp') tags.push('<span class="badge baixa">veio do WhatsApp</span>');
+  if (o.bloqueada) tags.push('<span class="badge alta">Tarefa travada</span>');
+  if (o.parada) tags.push(`<span class="badge media">Parada há ${o.dias_na_etapa}d</span>`);
+
+  return `
+  <article class="onb" draggable="true" data-id="${o.id}">
+    <div class="onb-top">
+      <span class="avatar">${esc(iniciais(o.franchise_name))}</span>
+      <div class="onb-name">${esc(o.franchise_name)}</div>
+    </div>
+    <div class="onb-meta">
+      ${esc(o.plan || 'sem plano informado')} · há ${o.dias_desde_o_inicio}d
+      ${o.owner ? ` · ${esc(o.owner)}` : ''}
+    </div>
+    ${tags.length ? `<div class="onb-tags">${tags.join('')}</div>` : ''}
+    <div class="progress" title="${o.tarefas_feitas} de ${o.total_tarefas} tarefas">
+      <span style="width:${progresso}%"></span>
+    </div>
+    <div class="onb-actions">
+      <button class="btn btn-sm" data-onb="abrir" data-id="${o.id}">Abrir</button>
+      ${proxima
+        ? `<button class="btn btn-sm btn-primary" data-onb="avancar" data-id="${o.id}" data-stage="${proxima.key}">
+             ${proxima.key === 'concluido' ? 'Concluir' : 'Avançar'}
+           </button>`
+        : `<button class="btn btn-sm" data-onb="reabrir" data-id="${o.id}">Reabrir</button>`}
+    </div>
+  </article>`;
+}
+
+async function renderOnboarding() {
+  await carregarEtapas();
+  const params = new URLSearchParams(Object.entries(onb.filtros).filter(([, v]) => v));
+  const [lista, stats] = await Promise.all([
+    apiCall(`/onboarding?${params}`),
+    apiCall('/onboarding/stats')
+  ]);
+
+  $('#onb-kpis').innerHTML = [
+    { label: 'Em implantação', value: stats.em_andamento },
+    { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, alert: stats.paradas > 0 },
+    { label: 'Com tarefa travada', value: stats.bloqueadas, alert: stats.bloqueadas > 0 },
+    { label: 'Concluídas', value: stats.concluidos },
+    { label: 'Dias até concluir', value: stats.dias_medios_para_concluir }
+  ].map((c) => `<div class="kpi ${c.alert ? 'alert' : ''}"><b>${esc(c.value)}</b><span>${esc(c.label)}</span></div>`).join('');
+
+  $('#onb-board').innerHTML = onb.stages.map((stage) => {
+    const cards = lista.filter((o) => o.stage === stage.key);
+    return `
+      <section class="col" data-stage="${stage.key}" style="--stage:${stage.color}">
+        <header class="col-head"><span class="dot"></span>${esc(stage.label)}
+          <span class="count">${cards.length}</span></header>
+        <div class="col-body">
+          ${cards.length ? cards.map(onbCard).join('') : '<div class="col-empty">Arraste franquias para cá</div>'}
+        </div>
+      </section>`;
+  }).join('');
+}
+
+function camposFranquia(o = {}) {
+  return [
+    { name: 'franchise_name', label: 'Nome da franquia', value: o.franchise_name, required: true },
+    { name: 'contact_name', label: 'Pessoa de contato', value: o.contact_name },
+    { name: 'phone', label: 'WhatsApp', value: o.phone },
+    { name: 'plan', label: 'Produto ou plano', value: o.plan },
+    { name: 'owner', label: 'Responsável pela implantação', value: o.owner ?? CS_PADRAO },
+    { name: 'whatsapp_group_name', label: 'Grupo do WhatsApp', value: o.whatsapp_group_name },
+    { name: 'notes', label: 'Observações', type: 'textarea', value: o.notes }
+  ];
+}
+
+async function abrirOnboarding(id) {
+  const o = await apiCall(`/onboarding/${id}`);
+  const etapa = onb.stages.find((s) => s.key === o.stage);
+  const dialog = $('#modal');
+  $('#modal-title').textContent = o.franchise_name;
+  $('#modal-confirm').textContent = 'Fechar';
+  $('#modal-body').innerHTML = `
+    <div class="meta">Etapa atual: <b>${esc(etapa?.label ?? o.stage)}</b> · há ${o.dias_na_etapa}d nesta etapa
+      · ${o.tarefas_feitas} de ${o.total_tarefas} tarefas
+      ${o.whatsapp_group_name ? `<br>Grupo: ${esc(o.whatsapp_group_name)}` : ''}
+      ${o.notes ? `<br>${esc(o.notes)}` : ''}
+    </div>
+    <div class="tasks">
+      ${o.tasks.map((t) => `
+        <label class="task ${t.status === 'feito' ? 'done' : ''} ${t.status === 'bloqueado' ? 'blocked' : ''}">
+          <input type="checkbox" data-task="${t.task_key}" ${t.status === 'feito' ? 'checked' : ''}
+            style="width:17px;height:17px" />
+          <span class="task-title">${esc(t.title)}
+            ${t.done_at ? `<small>concluída em ${esc(t.done_at.slice(0, 10).split('-').reverse().join('/'))}</small>` : ''}
+            ${t.status === 'bloqueado' ? '<small>travada</small>' : ''}
+          </span>
+          <button type="button" class="btn btn-sm btn-quiet" data-travar="${t.task_key}">
+            ${t.status === 'bloqueado' ? 'Destravar' : 'Travar'}
+          </button>
+        </label>`).join('')}
+    </div>
+    <div class="onb-actions" style="margin-top:12px">
+      <button type="button" class="btn btn-sm" data-editar="${o.id}">Editar dados</button>
+      <button type="button" class="btn btn-sm" data-pausar="${o.id}">
+        ${o.situacao === 'ativo' ? 'Pausar' : 'Retomar'}
+      </button>
+    </div>`;
+  dialog.showModal();
+
+  $('#modal-body').onclick = async (e) => {
+    const alvoTravar = e.target.closest('[data-travar]');
+    const alvoEditar = e.target.closest('[data-editar]');
+    const alvoPausar = e.target.closest('[data-pausar]');
+    try {
+      if (alvoTravar) {
+        const task = o.tasks.find((t) => t.task_key === alvoTravar.dataset.travar);
+        await apiCall(`/onboarding/${id}/tasks/${task.task_key}`, {
+          method: 'PATCH',
+          body: { status: task.status === 'bloqueado' ? 'pendente' : 'bloqueado', actor: CS_PADRAO }
+        });
+        dialog.close();
+        await renderOnboarding();
+        abrirOnboarding(id);
+      } else if (alvoEditar) {
+        dialog.close();
+        const form = await openModal({ title: `Editar ${o.franchise_name}`, fields: camposFranquia(o) });
+        if (form) {
+          await apiCall(`/onboarding/${id}`, { method: 'PATCH', body: { ...form, actor: CS_PADRAO } });
+          toast('Franquia atualizada.');
+        }
+        await renderOnboarding();
+      } else if (alvoPausar) {
+        await apiCall(`/onboarding/${id}`, {
+          method: 'PATCH',
+          body: { situacao: o.situacao === 'ativo' ? 'pausado' : 'ativo', actor: CS_PADRAO }
+        });
+        dialog.close();
+        toast(o.situacao === 'ativo' ? 'Implantação pausada.' : 'Implantação retomada.');
+        await renderOnboarding();
+      }
+    } catch (err) { toast(err.message); }
+  };
+
+  $('#modal-body').onchange = async (e) => {
+    const check = e.target.closest('input[data-task]');
+    if (!check) return;
+    try {
+      await apiCall(`/onboarding/${id}/tasks/${check.dataset.task}`, {
+        method: 'PATCH',
+        body: { status: check.checked ? 'feito' : 'pendente', actor: CS_PADRAO }
+      });
+      await renderOnboarding();
+      const atualizado = await apiCall(`/onboarding/${id}`);
+      if (atualizado.stage === 'concluido') {
+        dialog.close();
+        toast(`${atualizado.franchise_name}: implantação concluída 🎉`);
+      }
+    } catch (err) { toast(err.message); }
+  };
+}
+
+$('#new-onboarding').addEventListener('click', async () => {
+  const form = await openModal({
+    title: 'Nova franquia na esteira',
+    confirmLabel: 'Começar onboarding',
+    fields: camposFranquia()
+  });
+  if (!form) return;
+  try {
+    const criada = await apiCall('/onboarding', { method: 'POST', body: { ...form, actor: CS_PADRAO } });
+    toast(`${criada.franchise_name} entrou na esteira.`);
+    await renderOnboarding();
+  } catch (err) { toast(err.message); }
+});
+
+$('#onb-search').addEventListener('input', debounce((e) => {
+  onb.filtros.q = e.target.value.trim();
+  renderOnboarding();
+}));
+$('#onb-situacao').addEventListener('change', (e) => {
+  onb.filtros.situacao = e.target.value;
+  renderOnboarding();
+});
+
+$('#onb-board').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-onb]');
+  if (!btn) return;
+  try {
+    if (btn.dataset.onb === 'abrir') return abrirOnboarding(btn.dataset.id);
+    const stage = btn.dataset.onb === 'reabrir' ? 'teste_agente' : btn.dataset.stage;
+    await apiCall(`/onboarding/${btn.dataset.id}/stage`, { method: 'POST', body: { stage, actor: CS_PADRAO } });
+    await renderOnboarding();
+  } catch (err) { toast(err.message); }
+});
+
+// Arrastar cards entre colunas.
+let arrastando = null;
+$('#onb-board').addEventListener('dragstart', (e) => {
+  const card = e.target.closest('.onb');
+  if (!card) return;
+  arrastando = card.dataset.id;
+  card.classList.add('is-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', card.dataset.id);
+});
+$('#onb-board').addEventListener('dragend', (e) => {
+  e.target.closest('.onb')?.classList.remove('is-dragging');
+  $$('.col').forEach((c) => c.classList.remove('is-over'));
+  arrastando = null;
+});
+$('#onb-board').addEventListener('dragover', (e) => {
+  const col = e.target.closest('.col');
+  if (!col || !arrastando) return;
+  e.preventDefault();
+  $$('.col').forEach((c) => c.classList.toggle('is-over', c === col));
+});
+$('#onb-board').addEventListener('drop', async (e) => {
+  const col = e.target.closest('.col');
+  if (!col) return;
+  e.preventDefault();
+  const id = e.dataTransfer.getData('text/plain') || arrastando;
+  $$('.col').forEach((c) => c.classList.remove('is-over'));
+  if (!id) return;
+  try {
+    await apiCall(`/onboarding/${id}/stage`, { method: 'POST', body: { stage: col.dataset.stage, actor: CS_PADRAO } });
+    await renderOnboarding();
+  } catch (err) { toast(err.message); }
+});
+
 /* ---------------------------------- setup --------------------------------- */
 
 function switchView(view) {
@@ -337,6 +582,7 @@ function switchView(view) {
 async function refresh() {
   try {
     if (state.view === 'contatos') await renderContacts();
+    else if (state.view === 'onboarding') await renderOnboarding();
     else await Promise.all([renderMessages(), renderKpis()]);
   } catch (err) {
     toast(err.message);

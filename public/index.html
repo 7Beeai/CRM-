@@ -12,6 +12,7 @@
   <div class="brand"><span aria-hidden="true">🐝</span> CRM 7Bee</div>
   <nav class="tabs" role="tablist">
     <button class="tab is-active" data-view="triagem" role="tab">Triagem de mensagens</button>
+    <button class="tab" data-view="onboarding" role="tab">Onboarding</button>
     <button class="tab" data-view="contatos" role="tab">Contatos</button>
     <button class="tab" data-view="painel" role="tab">Painel</button>
   </nav>
@@ -59,6 +60,33 @@
     </div>
 
     <div id="msg-list" class="cards"></div>
+  </section>
+
+  <!-- ----------------------------- ONBOARDING ----------------------------- -->
+  <section id="view-onboarding" class="view is-hidden">
+    <div class="section-head">
+      <div>
+        <h1>Onboarding de franquias</h1>
+        <p class="meta">Esteira de implantação. Arraste o card ou use o botão para avançar de etapa.</p>
+      </div>
+      <button class="btn btn-primary" id="new-onboarding">+ Nova franquia</button>
+    </div>
+
+    <div class="kpis" id="onb-kpis"></div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <input type="search" id="onb-search" placeholder="Buscar franquia, responsável ou grupo…" />
+        <select id="onb-situacao">
+          <option value="ativo">Em andamento</option>
+          <option value="pausado">Pausadas</option>
+          <option value="cancelado">Canceladas</option>
+          <option value="todas">Todas</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="board" id="onb-board"></div>
   </section>
 
   <!-- ------------------------------ CONTATOS ------------------------------ -->
