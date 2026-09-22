@@ -1,5 +1,6 @@
 import { db, log } from './db.js';
 import { scoreMessage, dueDateFor } from './relevance.js';
+import { onboardingDoContato, linkDaConversa } from './onboarding.js';
 
 const MESSAGE_STATUSES = ['triagem', 'escalada', 'auto_respondida', 'respondida', 'arquivada'];
 const AGENT_DECISIONS = ['respondeu', 'escalou', 'ignorou'];
@@ -15,8 +16,8 @@ export function listContacts({ q = '', stage = '' } = {}) {
   let sql = `SELECT * FROM contacts WHERE 1=1`;
   const args = [];
   if (q) {
-    sql += ` AND (name LIKE ? OR company LIKE ? OR email LIKE ? OR phone LIKE ?)`;
-    args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    sql += ` AND (name LIKE ? OR company LIKE ? OR email LIKE ? OR phone LIKE ? OR tags LIKE ?)`;
+    args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   if (stage) {
     sql += ` AND stage = ?`;
@@ -226,7 +227,8 @@ function notifyEscalation(message) {
 export function listMessages({ status = '', priority = '', channel = '', assigned_to = '', q = '',
   sort = 'score', needs_human = '', aguardando_agente = '' } = {}) {
   let sql = `
-    SELECT m.*, c.name AS contact_name, c.company AS contact_company, c.is_customer
+    SELECT m.*, c.name AS contact_name, c.company AS contact_company, c.is_customer,
+           c.phone AS contact_phone
     FROM messages m LEFT JOIN contacts c ON c.id = m.contact_id WHERE 1=1`;
   const args = [];
   if (status) { sql += ` AND m.status = ?`; args.push(status); }
@@ -254,7 +256,8 @@ export function listMessages({ status = '', priority = '', channel = '', assigne
 
 export function getMessage(id) {
   const row = db.prepare(`
-    SELECT m.*, c.name AS contact_name, c.company AS contact_company, c.is_customer
+    SELECT m.*, c.name AS contact_name, c.company AS contact_company, c.is_customer,
+           c.phone AS contact_phone
     FROM messages m LEFT JOIN contacts c ON c.id = m.contact_id WHERE m.id = ?`).get(id);
   if (!row) throw Object.assign(new Error('Mensagem não encontrada.'), { status: 404 });
   return decorate(row);
@@ -269,8 +272,20 @@ function decorate(row) {
   const waitingHours = Math.round(
     (Date.now() - new Date(`${row.received_at.replace(' ', 'T')}Z`).getTime()) / 3.6e5
   ) / 10;
+  // Se o contato é uma franquia, o CS abre o grupo dela direto do card.
+  const onboarding = onboardingDoContato(row.contact_id);
+  const link = onboarding?.whatsapp_link
+    || linkDaConversa(row.sender_handle)
+    || linkDaConversa(row.contact_phone);
+  const destino = onboarding?.whatsapp_link
+    ? onboarding.whatsapp_destino
+    : (link ? 'conversa' : '');
+
   return {
     ...row,
+    onboarding: onboarding ?? null,
+    whatsapp_link: link,
+    whatsapp_destino: destino,
     overdue: Boolean(overdue),
     waiting_hours: waitingHours,
     aguardando_agente: !row.agent_decision && row.status === 'triagem',

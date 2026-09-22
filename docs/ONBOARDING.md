@@ -98,3 +98,35 @@ segundos, e a esteira funciona igual.
 
 Situação da franquia: `ativo`, `pausado` ou `cancelado`. Status de tarefa:
 `pendente`, `feito` ou `bloqueado`.
+
+## A franquia também vira contato
+
+Toda franquia que entra na esteira ganha um contato no CRM na mesma hora, seja
+pelo botão Nova franquia ou pela entrada automática do WhatsApp. É esse vínculo
+que faz a mensagem dela chegar identificada na triagem.
+
+O contato nasce com o nome da pessoa (ou da franquia, se ninguém foi informado),
+a franquia como empresa, o telefone, a etapa `cliente`, a marcação de cliente
+ativo e a tag `franquia`. Se já existe contato com o mesmo telefone ou com a
+franquia como empresa, o CRM reaproveita em vez de duplicar. Editar os dados da
+franquia atualiza o contato.
+
+Mensagens antigas daquele telefone que ainda estavam sem dono passam a apontar
+para o contato novo. Então uma franquia que escreveu antes de entrar na esteira
+aparece ligada assim que o onboarding é criado.
+
+## Abrir o grupo direto do card
+
+Cada card da triagem e da esteira tem um atalho para o WhatsApp:
+
+- **Abrir grupo**, quando a franquia tem link de convite do grupo salvo.
+- **Abrir conversa**, quando só existe o telefone. O CRM monta o endereço
+  `wa.me` com o número, assumindo Brasil quando o código do país não vem.
+
+O link do grupo é colado no campo **Link de convite do grupo**, em Nova franquia
+ou em Editar dados. Vale o convite inteiro (`https://chat.whatsapp.com/…`) ou só
+o código. Qualquer outro endereço é recusado, porque esse valor vira um link
+clicável na tela.
+
+Quando a detecção automática de grupos estiver de pé, o provedor manda o convite
+junto no campo `group_invite_link` e o atalho já nasce pronto.

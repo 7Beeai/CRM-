@@ -63,7 +63,9 @@ const ICON = {
   copy: traco('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5h10"/>'),
   undo: traco('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
   arrow: traco('<path d="M5 12h14M13 6l6 6-6 6"/>'),
-  eye: traco('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>')
+  eye: traco('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>'),
+  chat: traco('<path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z"/>'),
+  group: traco('<circle cx="9" cy="9" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 7a3 3 0 0 1 0 6M18 20a6 6 0 0 0-2-4.5"/>')
 };
 
 function waitLabel(hours) {
@@ -206,15 +208,26 @@ function messageCard(m) {
   }[m.status] ?? '';
 
   const regua = m.priority === 'alta' ? '' : m.priority === 'media' ? ' sb-msg__prio--mid' : ' sb-msg__prio--low';
-  const org = [m.contact_company, m.is_customer ? 'cliente ativo' : null].filter(Boolean).join(' · ');
+  const org = [
+    m.contact_company,
+    m.is_customer ? 'cliente ativo' : null,
+    m.onboarding ? `onboarding em ${m.onboarding.stage_label}` : null
+  ].filter(Boolean).join(' · ');
+
+  const abrirWhats = m.whatsapp_link
+    ? `<a class="sb-btn" href="${esc(m.whatsapp_link)}" target="_blank" rel="noopener noreferrer">
+         ${m.whatsapp_destino === 'grupo' ? `${ICON.group}Abrir grupo` : `${ICON.chat}Abrir conversa`}
+       </a>`
+    : '';
 
   const acoes = done
-    ? `<button class="sb-btn" data-act="reabrir" data-id="${m.id}">${ICON.undo}Assumir de volta</button>`
+    ? `<button class="sb-btn" data-act="reabrir" data-id="${m.id}">${ICON.undo}Assumir de volta</button>${abrirWhats}`
     : `<button class="sb-btn sb-btn--primary" data-act="responder" data-id="${m.id}">${ICON.check}Marcar respondida</button>
        ${m.status === 'triagem'
         ? `<button class="sb-btn" data-act="escalar" data-id="${m.id}">${ICON.arrow}Trazer para mim</button>` : ''}
        <button class="sb-btn" data-act="prioridade" data-id="${m.id}">${ICON.flag}Prioridade</button>
        <button class="sb-btn" data-act="nota" data-id="${m.id}">${ICON.note}Nota</button>
+       ${abrirWhats}
        <button class="sb-btn sb-btn--danger" data-act="arquivar" data-id="${m.id}">${ICON.x}Descartar</button>`;
 
   return `
@@ -444,6 +457,11 @@ function onbCard(o) {
     </div>
     <div class="onb__actions">
       <button class="sb-btn sb-btn--sm" data-onb="abrir" data-id="${o.id}">${ICON.eye}Abrir</button>
+      ${o.whatsapp_link
+        ? `<a class="sb-btn sb-btn--sm" href="${esc(o.whatsapp_link)}" target="_blank" rel="noopener noreferrer"
+             title="${o.whatsapp_destino === 'grupo' ? 'Abrir o grupo da franquia' : 'Abrir a conversa com o contato'}">
+             ${o.whatsapp_destino === 'grupo' ? ICON.group : ICON.chat}</a>`
+        : ''}
       ${proxima
         ? `<button class="sb-btn sb-btn--sm ${proxima.key === 'concluido' ? 'sb-btn--primary' : ''}"
              data-onb="avancar" data-id="${o.id}" data-stage="${proxima.key}">
@@ -490,7 +508,8 @@ function camposFranquia(o = {}) {
     { name: 'phone', label: 'WhatsApp', value: o.phone },
     { name: 'plan', label: 'Produto ou plano', value: o.plan },
     { name: 'owner', label: 'Responsável pela implantação', value: o.owner ?? CS_PADRAO },
-    { name: 'whatsapp_group_name', label: 'Grupo do WhatsApp', value: o.whatsapp_group_name },
+    { name: 'whatsapp_group_name', label: 'Nome do grupo no WhatsApp', value: o.whatsapp_group_name },
+    { name: 'whatsapp_group_link', label: 'Link de convite do grupo (chat.whatsapp.com/…)', value: o.whatsapp_group_link },
     { name: 'notes', label: 'Observações', type: 'textarea', value: o.notes }
   ];
 }
@@ -506,6 +525,10 @@ async function abrirOnboarding(id) {
       · ${o.tarefas_feitas} de ${o.total_tarefas} tarefas
       ${o.whatsapp_group_name ? `<br>Grupo: ${esc(o.whatsapp_group_name)}` : ''}
       ${o.notes ? `<br>${esc(o.notes)}` : ''}
+      ${o.whatsapp_link
+        ? `<br><a href="${esc(o.whatsapp_link)}" target="_blank" rel="noopener noreferrer">
+             ${o.whatsapp_destino === 'grupo' ? 'Abrir o grupo no WhatsApp' : 'Abrir a conversa no WhatsApp'}</a>`
+        : '<br>Sem link do grupo. Cole o convite em Editar dados para abrir daqui.'}
     </div>
     <div class="tasks">
       ${o.tasks.map((t) => `

@@ -47,6 +47,10 @@ de BM no Facebook, CTN e teste do agente de vendas. Dá para arrastar o card ou
 marcar as tarefas no detalhe, que as duas coisas se mantêm em acordo. Franquias
 paradas há muitos dias ou com tarefa travada ficam sinalizadas.
 
+Toda franquia da esteira também vira contato do CRM na hora, então as mensagens
+dela chegam identificadas na triagem, com a etapa do onboarding no card e um
+atalho que abre o grupo dela no WhatsApp.
+
 Franquias entram na esteira pelo botão **Nova franquia** ou sozinhas, quando um
 grupo novo aparece no WhatsApp do CS. Essa entrada automática depende do provedor
 de WhatsApp que vocês forem usar, e o caminho está explicado em

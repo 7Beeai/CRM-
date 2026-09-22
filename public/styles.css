@@ -51,6 +51,12 @@ button.sb-nav__link {
 }
 button.sb-nav__link:hover { background: var(--surface-raised); }
 
+/* Atalhos que são links, mas se comportam como botão. */
+a.sb-btn { text-decoration: none; color: var(--ink); }
+a.sb-btn:hover { color: var(--ink); }
+.onb__actions a.sb-btn { flex: 0 0 auto; padding: 0 10px; }
+.modal-info a { color: var(--honey-text); }
+
 /* ------------------------- triagem: estados do agente ------------------------ */
 
 .sb-agent--waiting {

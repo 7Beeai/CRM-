@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS onboardings (
   origem              TEXT NOT NULL DEFAULT 'manual',
   whatsapp_group_id   TEXT UNIQUE,
   whatsapp_group_name TEXT NOT NULL DEFAULT '',
+  whatsapp_group_link TEXT NOT NULL DEFAULT '',
   contact_id          INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
   started_at          TEXT NOT NULL DEFAULT (datetime('now')),
   stage_changed_at    TEXT NOT NULL DEFAULT (datetime('now')),
@@ -134,6 +135,11 @@ const additions = [
 for (const [name, type] of additions) {
   if (!existing.has(name)) db.exec(`ALTER TABLE messages ADD COLUMN ${name} ${type}`);
 }
+// Coluna criada depois do primeiro onboarding: link de convite do grupo.
+if (!new Set(db.prepare(`PRAGMA table_info(onboardings)`).all().map((c) => c.name)).has('whatsapp_group_link')) {
+  db.exec(`ALTER TABLE onboardings ADD COLUMN whatsapp_group_link TEXT NOT NULL DEFAULT ''`);
+}
+
 db.exec(`
 CREATE INDEX IF NOT EXISTS idx_messages_needs_human ON messages(needs_human);
 CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);

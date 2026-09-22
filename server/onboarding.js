@@ -29,6 +29,42 @@ const TASK_STATUSES = ['pendente', 'feito', 'bloqueado'];
 const PARADO_DIAS = Number(process.env.CRM_ONBOARDING_ALERTA_DIAS ?? 7);
 
 const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+/* ------------------------------ links do WhatsApp ----------------------------- */
+
+/**
+ * Aceita o link de convite do grupo (ou só o código) e devolve a URL canônica.
+ * Qualquer outra coisa volta vazia: o link vai parar num href, então nada de
+ * endereço inventado entra aqui.
+ */
+export function linkDoGrupo(valor) {
+  const bruto = String(valor ?? '').trim();
+  if (!bruto) return '';
+  const comProtocolo = /^https?:\/\//i.test(bruto) ? bruto : `https://chat.whatsapp.com/${bruto}`;
+  let url;
+  try {
+    url = new URL(comProtocolo);
+  } catch {
+    return '';
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+  if (url.hostname.toLowerCase() !== 'chat.whatsapp.com') return '';
+  const codigo = url.pathname.replace(/^\/+/, '').split('/')[0];
+  return /^[A-Za-z0-9]{6,60}$/.test(codigo) ? `https://chat.whatsapp.com/${codigo}` : '';
+}
+
+/** Telefone em dígitos, assumindo Brasil quando vem sem código do país. */
+export function telefoneEmDigitos(valor) {
+  const digitos = String(valor ?? '').replace(/\D/g, '');
+  if (digitos.length < 10) return '';
+  return digitos.length <= 11 ? `55${digitos}` : digitos;
+}
+
+/** Conversa direta com a pessoa, quando não há grupo. */
+export function linkDaConversa(telefone) {
+  const digitos = telefoneEmDigitos(telefone);
+  return digitos ? `https://wa.me/${digitos}` : '';
+}
 const parse = (s) => new Date(`${s.replace(' ', 'T')}Z`).getTime();
 const bad = (msg) => Object.assign(new Error(msg), { status: 400 });
 const naoEncontrado = () => Object.assign(new Error('Onboarding não encontrado.'), { status: 404 });
@@ -47,6 +83,8 @@ function decorate(row) {
   const diasNaEtapa = Math.floor((Date.now() - parse(row.stage_changed_at)) / 8.64e7);
   return {
     ...row,
+    whatsapp_link: row.whatsapp_group_link || linkDaConversa(row.phone),
+    whatsapp_destino: row.whatsapp_group_link ? 'grupo' : (linkDaConversa(row.phone) ? 'conversa' : ''),
     tasks,
     total_tarefas: tasks.length,
     tarefas_feitas: feitas,
@@ -76,6 +114,60 @@ export function getOnboarding(id) {
   return decorate(row);
 }
 
+/* --------------------------- ligação com os contatos -------------------------- */
+
+/**
+ * Toda franquia na esteira também é um contato do CRM: é assim que as mensagens
+ * dela chegam já identificadas na triagem. Se já existe contato com o mesmo
+ * telefone, reaproveita em vez de duplicar.
+ */
+function sincronizarContato(onboarding, { actor = 'sistema' } = {}) {
+  const digitos = telefoneEmDigitos(onboarding.phone);
+  let contato = onboarding.contact_id
+    ? db.prepare(`SELECT * FROM contacts WHERE id = ?`).get(onboarding.contact_id)
+    : null;
+
+  if (!contato && digitos) {
+    contato = db.prepare(`SELECT * FROM contacts WHERE replace(replace(replace(replace(phone,'+',''),'-',''),' ',''),'(','') LIKE ?`)
+      .get(`%${digitos.slice(-11)}%`) ?? null;
+  }
+  if (!contato) {
+    contato = db.prepare(`SELECT * FROM contacts WHERE lower(company) = lower(?)`).get(onboarding.franchise_name) ?? null;
+  }
+
+  const nome = onboarding.contact_name?.trim() || onboarding.franchise_name;
+  if (contato) {
+    db.prepare(`UPDATE contacts SET name = ?, company = ?, phone = ?, is_customer = 1,
+      owner = CASE WHEN owner = '' THEN ? ELSE owner END,
+      tags = CASE WHEN tags LIKE '%franquia%' THEN tags
+                  WHEN tags = '' THEN 'franquia'
+                  ELSE tags || ', franquia' END,
+      updated_at = ? WHERE id = ?`)
+      .run(nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? '', now(), contato.id);
+  } else {
+    const info = db.prepare(`
+      INSERT INTO contacts (name, company, phone, stage, owner, tags, is_customer)
+      VALUES (?, ?, ?, 'cliente', ?, 'franquia', 1)
+    `).run(nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? 'Guilherme');
+    contato = db.prepare(`SELECT * FROM contacts WHERE id = ?`).get(Number(info.lastInsertRowid));
+    log('contato_criado', `${nome} (franquia ${onboarding.franchise_name})`,
+      { contactId: contato.id, onboardingId: onboarding.id, actor });
+  }
+
+  db.prepare(`UPDATE onboardings SET contact_id = ?, updated_at = ? WHERE id = ?`)
+    .run(contato.id, now(), onboarding.id);
+
+  // Mensagens antigas desse telefone passam a apontar para o contato.
+  if (digitos) {
+    const finalDoNumero = `%${digitos.slice(-8)}`;
+    db.prepare(`UPDATE messages SET contact_id = ?, updated_at = ?
+                WHERE contact_id IS NULL AND sender_handle <> '' AND
+                      replace(replace(replace(replace(sender_handle,'+',''),'-',''),' ',''),'(','') LIKE ?`)
+      .run(contato.id, now(), finalDoNumero);
+  }
+  return contato;
+}
+
 /* ---------------------------------- escrita --------------------------------- */
 
 export function createOnboarding(input = {}) {
@@ -91,14 +183,15 @@ export function createOnboarding(input = {}) {
 
   const info = db.prepare(`
     INSERT INTO onboardings (franchise_name, contact_name, phone, plan, owner, stage, notes,
-                             origem, whatsapp_group_id, whatsapp_group_name, contact_id, started_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             origem, whatsapp_group_id, whatsapp_group_name, whatsapp_group_link,
+                             contact_id, started_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     nome, input.contact_name ?? '', input.phone ?? '', input.plan ?? '',
     input.owner ?? 'Guilherme', input.stage ?? 'nova', input.notes ?? '',
     input.origem ?? 'manual', input.whatsapp_group_id ?? null,
-    input.whatsapp_group_name ?? '', input.contact_id ?? null,
-    input.started_at ?? now()
+    input.whatsapp_group_name ?? '', linkDoGrupo(input.whatsapp_group_link),
+    input.contact_id ?? null, input.started_at ?? now()
   );
 
   const id = Number(info.lastInsertRowid);
@@ -108,17 +201,25 @@ export function createOnboarding(input = {}) {
   for (const t of TASK_TEMPLATE) insert.run(id, t.task_key, t.title, t.position);
 
   log('onboarding_criado', `${nome} (${input.origem ?? 'manual'})`, { onboardingId: id, actor: input.actor ?? 'sistema' });
+  sincronizarContato(db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id), { actor: input.actor ?? 'sistema' });
   return getOnboarding(id);
 }
 
 export function updateOnboarding(id, patch = {}) {
   getOnboarding(id);
   const campos = ['franchise_name', 'contact_name', 'phone', 'plan', 'owner', 'notes',
-    'whatsapp_group_name', 'situacao'];
+    'whatsapp_group_name', 'whatsapp_group_link', 'situacao'];
   const sets = [];
   const args = [];
   for (const f of campos) {
     if (patch[f] === undefined) continue;
+    if (f === 'whatsapp_group_link') {
+      const link = linkDoGrupo(patch[f]);
+      if (patch[f] && !link) throw bad('O link do grupo precisa ser um convite do WhatsApp (chat.whatsapp.com).');
+      sets.push('whatsapp_group_link = ?');
+      args.push(link);
+      continue;
+    }
     if (f === 'situacao' && !['ativo', 'pausado', 'cancelado'].includes(patch[f])) {
       throw bad('Situação inválida. Use ativo, pausado ou cancelado.');
     }
@@ -129,6 +230,8 @@ export function updateOnboarding(id, patch = {}) {
     db.prepare(`UPDATE onboardings SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...args, now(), id);
     log('onboarding_atualizado', sets.map((s) => s.split(' =')[0]).join(', '),
       { onboardingId: id, actor: patch.actor ?? 'sistema' });
+    sincronizarContato(db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id),
+      { actor: patch.actor ?? 'sistema' });
   }
   return getOnboarding(id);
 }
@@ -215,6 +318,7 @@ export function fromWhatsappGroup(input = {}) {
     franchise_name: nomeDaFranquia(groupName),
     whatsapp_group_id: groupId,
     whatsapp_group_name: groupName,
+    whatsapp_group_link: input.group_invite_link ?? input.invite_link ?? '',
     contact_name: input.contact_name ?? '',
     phone: input.phone ?? '',
     plan: input.plan ?? '',
@@ -232,6 +336,24 @@ export function nomeDaFranquia(groupName) {
     .replace(/\s*[×x]\s*7bee\s*$/i, '')
     .replace(/^\s*7bee\s*[×x]\s*/i, '')
     .trim() || groupName.trim();
+}
+
+/** Onboarding ligado a um contato, para a triagem mostrar a franquia e o grupo. */
+export function onboardingDoContato(contactId) {
+  if (!contactId) return null;
+  const row = db.prepare(
+    `SELECT * FROM onboardings WHERE contact_id = ? ORDER BY updated_at DESC LIMIT 1`
+  ).get(contactId);
+  if (!row) return null;
+  const etapa = STAGES.find((s) => s.key === row.stage);
+  return {
+    id: row.id,
+    franchise_name: row.franchise_name,
+    stage: row.stage,
+    stage_label: etapa?.label ?? row.stage,
+    whatsapp_link: row.whatsapp_group_link || linkDaConversa(row.phone),
+    whatsapp_destino: row.whatsapp_group_link ? 'grupo' : (linkDaConversa(row.phone) ? 'conversa' : '')
+  };
 }
 
 /* -------------------------------- indicadores ------------------------------- */
