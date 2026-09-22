@@ -101,3 +101,13 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
   opacity:0;pointer-events:none;transition:.2s}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .empty{text-align:center;color:var(--muted);padding:48px 16px}
+
+@media (max-width:640px){
+  .topbar{gap:10px;padding:10px 14px}
+  .brand{flex:1}
+  .tabs{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{white-space:nowrap;padding:7px 12px;font-size:14px}
+  .msg-head .meta{margin-left:0 !important;width:100%}
+  .msg-actions .meta{margin-left:0 !important;width:100%}
+}
