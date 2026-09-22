@@ -1,0 +1,13 @@
+{
+  "name": "crm-7bee",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRM interno 7Bee: triagem de mensagens relevantes, contatos e pipeline.",
+  "type": "module",
+  "engines": { "node": ">=22.5.0" },
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "dev": "node --no-warnings --watch server/index.js",
+    "seed": "node --no-warnings server/seed.js"
+  }
+}
