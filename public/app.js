@@ -2,9 +2,19 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const CS_PADRAO = 'Guilherme';
 
+const FILAS = {
+  precisa: { needs_human: '1' },
+  aguardando: { aguardando_agente: '1' },
+  auto: { status: 'auto_respondida' },
+  respondidas: { status: 'respondida' },
+  arquivadas: { status: 'arquivada' },
+  todas: {}
+};
+
 const state = {
   view: 'triagem',
-  msgFilters: { status: '', q: '', priority: '', channel: '', sort: 'score' },
+  fila: 'precisa',
+  msgFilters: { q: '', priority: '', channel: '', sort: 'score' },
   contactFilters: { q: '', stage: '' }
 };
 
@@ -85,20 +95,70 @@ function openModal({ title, fields, confirmLabel = 'Salvar' }) {
 
 /* --------------------------------- triagem -------------------------------- */
 
+function agentBlock(m) {
+  if (!m.agent_decision) {
+    return m.agente_atrasado
+      ? `<div class="agent agent-late">O agente ainda não decidiu esta mensagem
+           (${waitLabel(m.waiting_hours)}). Talvez ele esteja fora do ar.</div>`
+      : `<div class="agent agent-wait">Aguardando a análise do agente.</div>`;
+  }
+
+  const decisao = {
+    respondeu: 'Respondeu sozinho',
+    escalou: 'Escalou para você',
+    ignorou: 'Descartou'
+  }[m.agent_decision] ?? m.agent_decision;
+  const conf = m.agent_confidence === null || m.agent_confidence === undefined
+    ? '' : ` · confiança ${Math.round(m.agent_confidence * 100)}%`;
+  const texto = m.agent_reply || m.agent_suggested_reply;
+  const rotulo = m.agent_reply ? 'Respondeu ao cliente' : 'Rascunho sugerido para você';
+
+  return `
+    <div class="agent">
+      <div class="agent-head">
+        <span class="badge agent-badge">${esc(m.agent_name || 'agente')}: ${esc(decisao)}</span>
+        <span class="meta">${esc(m.agent_intent || 'sem categoria')}${conf}</span>
+      </div>
+      ${m.agent_reason ? `<div class="meta">Motivo: ${esc(m.agent_reason)}</div>` : ''}
+      ${texto ? `<details class="agent-reply"><summary>${rotulo}</summary><p>${esc(texto)}</p>
+        <button class="btn btn-sm" data-act="copiar" data-id="${m.id}">Copiar texto</button></details>` : ''}
+    </div>`;
+}
+
+function feedbackRow(m) {
+  if (!m.agent_decision) return '';
+  if (m.human_feedback) {
+    const rotulo = {
+      acertou: 'você marcou: o agente acertou',
+      deveria_escalar: 'você marcou: deveria ter escalado',
+      nao_precisava_escalar: 'você marcou: não precisava escalar',
+      resposta_ruim: 'você marcou: a resposta ficou ruim'
+    }[m.human_feedback] ?? m.human_feedback;
+    return `<div class="feedback meta">✓ ${esc(rotulo)}</div>`;
+  }
+  const opcao = (valor, rotulo) =>
+    `<button class="btn btn-sm btn-quiet" data-act="feedback" data-id="${m.id}" data-feedback="${valor}">${rotulo}</button>`;
+  return `<div class="feedback"><span class="meta">O agente acertou?</span>
+    ${opcao('acertou', 'Acertou')}
+    ${m.needs_human ? opcao('nao_precisava_escalar', 'Não precisava me chamar') : opcao('deveria_escalar', 'Deveria ter me chamado')}
+    ${m.agent_reply ? opcao('resposta_ruim', 'Resposta ruim') : ''}</div>`;
+}
+
 function messageCard(m) {
-  const done = m.status === 'respondida' || m.status === 'arquivada';
+  const done = ['respondida', 'arquivada', 'auto_respondida'].includes(m.status);
   const statusBadge = {
-    triagem: '<span class="badge baixa">Para triar</span>',
-    relevante: '<span class="badge alta">Relevante</span>',
+    triagem: '<span class="badge baixa">Em análise do agente</span>',
+    escalada: '<span class="badge alta">Precisa de você</span>',
+    auto_respondida: '<span class="badge ok">Agente respondeu</span>',
     respondida: '<span class="badge ok">Respondida</span>',
-    arquivada: '<span class="badge baixa">Arquivada</span>'
+    arquivada: '<span class="badge baixa">Descartada</span>'
   }[m.status] ?? '';
 
   const actions = done
-    ? `<button class="btn btn-sm" data-act="reabrir" data-id="${m.id}">Reabrir</button>`
+    ? `<button class="btn btn-sm" data-act="reabrir" data-id="${m.id}">Assumir de volta</button>`
     : `<button class="btn btn-sm btn-primary" data-act="responder" data-id="${m.id}">Marcar respondida</button>
-       ${m.status === 'triagem' ? `<button class="btn btn-sm" data-act="relevante" data-id="${m.id}">É relevante</button>` : ''}
-       <button class="btn btn-sm" data-act="arquivar" data-id="${m.id}">Ignorar</button>`;
+       ${m.status === 'triagem' ? `<button class="btn btn-sm" data-act="escalar" data-id="${m.id}">Trazer para mim</button>` : ''}
+       <button class="btn btn-sm" data-act="arquivar" data-id="${m.id}">Descartar</button>`;
 
   return `
   <article class="msg ${done ? 'is-done' : ''}" data-priority="${m.priority}">
@@ -112,6 +172,7 @@ function messageCard(m) {
     </div>
     ${m.subject ? `<div class="meta"><b>${esc(m.subject)}</b></div>` : ''}
     <p class="msg-body">${esc(m.body)}</p>
+    ${agentBlock(m)}
     <div class="msg-why">Por que priorizar: ${esc(m.reasons || 'sem sinais fortes')}</div>
     <div class="msg-actions">
       ${actions}
@@ -120,12 +181,13 @@ function messageCard(m) {
       <span class="meta" style="margin-left:auto">Responsável: ${esc(m.assigned_to || '—')}</span>
     </div>
     ${m.internal_note ? `<div class="msg-note">${esc(m.internal_note)}</div>` : ''}
+    ${feedbackRow(m)}
   </article>`;
 }
 
 async function renderMessages() {
   const params = new URLSearchParams(
-    Object.entries(state.msgFilters).filter(([, v]) => v)
+    Object.entries({ ...state.msgFilters, ...FILAS[state.fila] }).filter(([, v]) => v)
   );
   const list = await apiCall(`/messages?${params}`);
   $('#msg-list').innerHTML = list.length
@@ -136,11 +198,11 @@ async function renderMessages() {
 async function renderKpis() {
   const d = await apiCall('/dashboard');
   const cards = [
-    { label: 'Para triar', value: d.triagem },
-    { label: 'Marcadas como relevantes', value: d.relevantes },
-    { label: 'Alta prioridade em aberto', value: d.alta_prioridade, alert: d.alta_prioridade > 0 },
+    { label: 'Precisam de você', value: d.escaladas, alert: d.escaladas > 0 },
     { label: 'Fora do prazo', value: d.atrasadas, alert: d.atrasadas > 0 },
-    { label: 'Respondidas hoje', value: d.respondidas_hoje },
+    { label: 'Aguardando o agente', value: d.aguardando_agente },
+    { label: 'Respondidas pelo agente', value: d.auto_respondidas },
+    { label: 'Resolvidas sem humano', value: `${d.taxa_automacao}%` },
     { label: 'Tempo médio de resposta', value: `${d.tempo_medio_resposta_horas}h` }
   ];
   const html = cards.map((c) =>
@@ -161,13 +223,39 @@ async function renderKpis() {
   };
   $('#chart-channel').innerHTML = bars(d.por_canal, 'channel');
   $('#chart-stage').innerHTML = bars(d.pipeline, 'stage');
+
+  const rotuloDecisao = {
+    respondeu: 'respondeu sozinho', escalou: 'escalou para humano',
+    ignorou: 'descartou', 'sem decisão': 'ainda sem decisão'
+  };
+  $('#chart-agent').innerHTML = bars(
+    d.por_decisao_do_agente.map((r) => ({ decisao: rotuloDecisao[r.decisao] ?? r.decisao, n: r.n })), 'decisao');
+
+  const rotuloFeedback = {
+    acertou: 'acertou', deveria_escalar: 'deveria ter escalado',
+    nao_precisava_escalar: 'escalou sem precisar', resposta_ruim: 'resposta ruim'
+  };
+  $('#chart-feedback').innerHTML = d.feedback_agente.length
+    ? bars(d.feedback_agente.map((r) => ({ feedback: rotuloFeedback[r.feedback] ?? r.feedback, n: r.n })), 'feedback')
+    : '<div class="meta">Ninguém avaliou o agente ainda. Use os botões nos cards da triagem.</div>';
 }
 
 async function handleMessageAction(act, id) {
   if (act === 'responder') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'respondida', actor: CS_PADRAO } });
-  else if (act === 'relevante') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'relevante', assigned_to: CS_PADRAO, actor: CS_PADRAO } });
+  else if (act === 'escalar') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'escalada', assigned_to: CS_PADRAO, actor: CS_PADRAO } });
+  else if (act === 'copiar') {
+    const m = await apiCall(`/messages/${id}`);
+    const texto = m.agent_reply || m.agent_suggested_reply;
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast('Texto copiado.');
+    } catch {
+      toast('Seu navegador bloqueou a cópia. Selecione o texto na tela.');
+    }
+    return;
+  }
   else if (act === 'arquivar') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'arquivada', actor: CS_PADRAO } });
-  else if (act === 'reabrir') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'triagem', actor: CS_PADRAO } });
+  else if (act === 'reabrir') await apiCall(`/messages/${id}`, { method: 'PATCH', body: { status: 'escalada', assigned_to: CS_PADRAO, actor: CS_PADRAO } });
   else if (act === 'prioridade') {
     const form = await openModal({
       title: 'Ajustar prioridade',
@@ -189,6 +277,12 @@ async function handleMessageAction(act, id) {
     await apiCall(`/messages/${id}`, { method: 'PATCH', body: { ...form, actor: CS_PADRAO } });
   }
   toast('Mensagem atualizada.');
+  await Promise.all([renderMessages(), renderKpis()]);
+}
+
+async function enviarFeedback(id, feedback) {
+  await apiCall(`/messages/${id}/feedback`, { method: 'POST', body: { feedback, actor: CS_PADRAO } });
+  toast('Avaliação registrada. Isso ajuda a ajustar o agente.');
   await Promise.all([renderMessages(), renderKpis()]);
 }
 
@@ -256,7 +350,7 @@ $('#status-chips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
   if (!chip) return;
   $$('#status-chips .chip').forEach((c) => c.classList.toggle('is-active', c === chip));
-  state.msgFilters.status = chip.dataset.status;
+  state.fila = chip.dataset.view;
   renderMessages();
 });
 
@@ -271,8 +365,10 @@ for (const [sel, key] of [['#msg-priority', 'priority'], ['#msg-channel', 'chann
 $('#msg-list').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
-  try { await handleMessageAction(btn.dataset.act, btn.dataset.id); }
-  catch (err) { toast(err.message); }
+  try {
+    if (btn.dataset.act === 'feedback') await enviarFeedback(btn.dataset.id, btn.dataset.feedback);
+    else await handleMessageAction(btn.dataset.act, btn.dataset.id);
+  } catch (err) { toast(err.message); }
 });
 
 $('#new-message').addEventListener('click', async () => {

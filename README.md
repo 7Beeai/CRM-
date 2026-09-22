@@ -1,8 +1,9 @@
 # CRM 7Bee
 
-CRM interno enxuto para a operação: o time registra as mensagens que chegam de
-vários canais, o sistema pontua automaticamente quais são realmente relevantes e
-o CS (Guilherme) responde na ordem certa, sem perder o que importa.
+CRM interno enxuto para a operação. O agente de atendimento faz a primeira
+triagem: responde sozinho o que consegue resolver e escala para o CS (Guilherme)
+só o que precisa de gente. O CRM é o painel de controle disso, e também pontua
+cada mensagem por conta própria, para que a fila humana venha na ordem certa.
 
 Roda com **zero dependências** — só Node.js 22.5 ou superior (usa o SQLite nativo).
 
@@ -22,21 +23,30 @@ Variáveis de ambiente:
 | --- | --- | --- |
 | `PORT` | porta do servidor | `3000` |
 | `CRM_DB` | caminho do banco | `data/crm.db` |
-| `CRM_TOKEN` | exige token no envio de mensagens via API | vazio (sem token) |
+| `CRM_TOKEN` | exige token nas chamadas do agente | vazio (sem token) |
+| `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
+| `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
 
 ## As três abas
 
-**Triagem de mensagens** é o coração do CRM. Cada mensagem recebe uma nota de 0 a
-100 e uma prioridade, com a explicação de *por que* ela subiu ou desceu na fila.
-O CS trabalha de cima para baixo e marca cada item como relevante, respondida ou
-ignorada. Os indicadores do topo mostram o que está em aberto, o que passou do
-prazo e o tempo médio de resposta.
+**Triagem de mensagens** é o coração do CRM, e já abre na fila do que o agente
+escalou. Cada card mostra a decisão do agente, a confiança, o motivo e, quando
+existe, o rascunho de resposta ou o texto que ele já mandou ao cliente. O CS
+responde, descarta ou traz de volta uma mensagem, e avalia se o agente acertou.
+As outras abas da fila separam o que está aguardando o agente, o que ele
+respondeu sozinho e o que já foi resolvido.
+
+Além da decisão do agente, o CRM pontua cada mensagem de 0 a 100 e explica *por
+que* ela subiu ou desceu na fila, então mesmo que o agente fique fora do ar a
+ordem continua fazendo sentido.
 
 **Contatos** guarda quem é quem: empresa, canais, etapa no funil, responsável e
 observações. Marcar alguém como cliente ativo faz as mensagens dessa pessoa
 subirem na triagem automaticamente.
 
-**Painel** reúne os números do período: volume por canal e distribuição do funil.
+**Painel** reúne os números do período: quanto o agente resolve sem humano, o que
+ele fez com cada mensagem, como o time avaliou essas decisões, o volume por canal
+e a distribuição do funil.
 
 ## Como a relevância é calculada
 
@@ -66,6 +76,21 @@ Para mudar os pesos ou incluir termos do seu negócio, edite a lista `RULES` nes
 arquivo. As mensagens já cadastradas podem ser repontuadas com
 `POST /api/messages/:id/rescore`.
 
+## O agente de triagem
+
+Quem constrói o agente encontra o contrato completo em
+[`docs/AGENTE.md`](docs/AGENTE.md): as três decisões possíveis, todos os campos,
+o caminho de duas chamadas e o aviso de escalonamento. O resumo:
+
+```bash
+POST /api/messages          # registra a mensagem, com a decisão junto se já houver
+POST /api/messages/:id/agent  # ou decide depois, em chamada separada
+GET  /api/agent/queue       # mensagens que ainda esperam decisão
+```
+
+O arquivo `scripts/exemplo-agente.mjs` é um agente de mentira que exercita tudo
+isso, útil para testar a integração antes de plugar o agente de verdade.
+
 ## Integrar com WhatsApp, e-mail ou formulário
 
 Qualquer automação pode despejar mensagens no CRM por uma chamada HTTP. O campo
@@ -91,8 +116,11 @@ entra vinculada a ele.
 
 | Método e rota | O que faz |
 | --- | --- |
-| `GET /api/messages` | lista com filtros `status`, `priority`, `channel`, `assigned_to`, `q`, `sort` |
-| `POST /api/messages` | registra mensagem e calcula a relevância |
+| `GET /api/messages` | lista com filtros `status`, `needs_human`, `aguardando_agente`, `priority`, `channel`, `assigned_to`, `q`, `sort` |
+| `POST /api/messages` | registra mensagem e calcula a relevância, aceita a decisão do agente junto |
+| `POST /api/messages/:id/agent` | registra a decisão do agente |
+| `POST /api/messages/:id/feedback` | avaliação do time sobre a decisão do agente |
+| `GET /api/agent/queue` | mensagens sem decisão do agente |
 | `GET /api/messages/:id` | detalhe de uma mensagem |
 | `PATCH /api/messages/:id` | altera status, prioridade, responsável ou nota interna |
 | `POST /api/messages/:id/rescore` | recalcula a pontuação |
@@ -112,6 +140,8 @@ server/api.js         regras de negócio
 server/index.js       servidor HTTP e rotas
 server/seed.js        dados de exemplo
 public/               interface web (HTML, CSS e JS puros)
+scripts/              agente de exemplo para testar a integração
+docs/AGENTE.md        contrato de integração com o agente
 ```
 
 ## Antes de expor na internet

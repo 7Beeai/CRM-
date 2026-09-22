@@ -56,7 +56,7 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
-// Webhook de entrada: protegido por token quando CRM_TOKEN estiver definido.
+// Entrada de mensagens e decisões do agente: protegida por token quando CRM_TOKEN estiver definido.
 function webhookAuthorized(req) {
   if (!TOKEN) return true;
   const header = req.headers.authorization ?? '';
@@ -72,6 +72,12 @@ const server = createServer(async (req, res) => {
 
   try {
     const idMatch = pathname.match(/^\/api\/(messages|contacts)\/(\d+)(\/[a-z]+)?$/);
+
+    // Fila do agente: mensagens que ainda esperam uma decisão.
+    if (pathname === '/api/agent/queue' && req.method === 'GET') {
+      if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
+      return send(res, 200, api.listMessages({ ...q, aguardando_agente: '1', sort: q.sort ?? 'recente' }));
+    }
 
     if (pathname === '/api/health') return send(res, 200, { ok: true });
     if (pathname === '/api/meta' && req.method === 'GET') return send(res, 200, api.meta);
@@ -96,6 +102,13 @@ const server = createServer(async (req, res) => {
       if (kind === 'messages') {
         if (sub === '/activities' && req.method === 'GET') return send(res, 200, api.messageActivities(id));
         if (sub === '/rescore' && req.method === 'POST') return send(res, 200, api.rescoreMessage(id));
+        if (sub === '/agent' && req.method === 'POST') {
+          if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
+          return send(res, 200, api.applyAgentDecision(id, await readJson(req)));
+        }
+        if (sub === '/feedback' && req.method === 'POST') {
+          return send(res, 200, api.setHumanFeedback(id, await readJson(req)));
+        }
         if (sub) return send(res, 404, { error: 'Rota não encontrada.' });
         if (req.method === 'GET') return send(res, 200, api.getMessage(id));
         if (req.method === 'PATCH') return send(res, 200, api.updateMessage(id, await readJson(req)));

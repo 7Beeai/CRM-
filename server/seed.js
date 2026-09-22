@@ -1,5 +1,5 @@
 import { db } from './db.js';
-import { createContact, createMessage } from './api.js';
+import { createContact, createMessage, applyAgentDecision, setHumanFeedback } from './api.js';
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3.6e6).toISOString().slice(0, 19).replace('T', ' ');
 
@@ -27,6 +27,22 @@ const messages = [
   { sender_name: 'Mariana Lopes', sender_handle: '+5511988887777', channel: 'whatsapp', body: 'ok obrigada!', received_at: hoursAgo(1) },
   { sender_name: 'João Ribeiro', sender_handle: 'joao@novaempresa.com', channel: 'email', subject: 'Nota fiscal de agosto', body: 'Bom dia, poderiam reenviar a nota fiscal de agosto? O financeiro não localizou o boleto.', received_at: hoursAgo(30) }
 ];
-for (const m of messages) createMessage(m);
+const criadas = messages.map(createMessage);
 
-console.log(`Seed concluído: ${contacts.length} contatos e ${messages.length} mensagens.`);
+// Decisões de exemplo, como se o agente já tivesse passado pela fila.
+const decisoes = [
+  { i: 0, decision: 'escalou', confidence: 0.93, intent: 'incidente', reason: 'Cliente ativo relatando indisponibilidade com prazo hoje. Precisa de posição humana.', suggested_reply: 'Oi Mariana, o time já está olhando a indisponibilidade do painel. Te dou uma posição em até 30 minutos.' },
+  { i: 1, decision: 'escalou', confidence: 0.88, intent: 'fechamento', reason: 'Quer fechar contrato e pediu link de pagamento. Envolve valor e condição comercial.', suggested_reply: 'Rafael, que ótima notícia! Já preparo o link de pagamento e te mando ainda hoje.' },
+  { i: 2, decision: 'escalou', confidence: 0.96, intent: 'churn', reason: 'Pedido de cancelamento com insatisfação. Retenção precisa de humano.' },
+  { i: 3, decision: 'respondeu', confidence: 0.79, intent: 'preco', reply: 'Oi Diego! Para 12 pessoas o plano sai por R$ 49 por usuário ao mês. Consigo te mostrar em uma demo de 20 minutos, tenho horários amanhã de manhã. Qual fica melhor?' },
+  { i: 4, decision: 'respondeu', confidence: 0.92, intent: 'elogio', reply: 'Que bom que gostou, Patrícia! Obrigado por acompanhar a gente 💛' },
+  { i: 5, decision: 'ignorou', confidence: 0.99, intent: 'spam', reason: 'Newsletter promocional automática, sem pergunta ao time.' },
+  { i: 6, decision: 'respondeu', confidence: 0.95, intent: 'agradecimento', reply: 'Imagina, Mariana! Qualquer coisa é só chamar.' },
+  { i: 7, decision: 'respondeu', confidence: 0.61, intent: 'financeiro', reply: 'Bom dia, João! Já reenviei a nota fiscal e o boleto de agosto para este e-mail.', needs_human: true, reason: 'Confiança baixa: não confirmei se a nota realmente foi emitida.' }
+];
+for (const d of decisoes) applyAgentDecision(criadas[d.i].id, { agent: 'agente-cs', ...d });
+
+setHumanFeedback(criadas[4].id, { feedback: 'acertou', actor: 'Guilherme' });
+setHumanFeedback(criadas[6].id, { feedback: 'acertou', actor: 'Guilherme' });
+
+console.log(`Seed concluído: ${contacts.length} contatos, ${messages.length} mensagens e ${decisoes.length} decisões do agente.`);

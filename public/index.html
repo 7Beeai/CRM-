@@ -25,11 +25,12 @@
 
     <div class="toolbar">
       <div class="chips" id="status-chips">
-        <button class="chip is-active" data-status="">Todas</button>
-        <button class="chip" data-status="triagem">Para triar</button>
-        <button class="chip" data-status="relevante">Relevantes</button>
-        <button class="chip" data-status="respondida">Respondidas</button>
-        <button class="chip" data-status="arquivada">Arquivadas</button>
+        <button class="chip is-active" data-view="precisa">Precisam de você</button>
+        <button class="chip" data-view="aguardando">Aguardando o agente</button>
+        <button class="chip" data-view="auto">Respondidas pelo agente</button>
+        <button class="chip" data-view="respondidas">Respondidas por você</button>
+        <button class="chip" data-view="arquivadas">Descartadas</button>
+        <button class="chip" data-view="todas">Todas</button>
       </div>
       <div class="filters">
         <input type="search" id="msg-search" placeholder="Buscar texto ou remetente…" />
@@ -97,6 +98,14 @@
       <div class="card">
         <h3>Contatos por etapa</h3>
         <div id="chart-stage" class="bars"></div>
+      </div>
+      <div class="card">
+        <h3>O que o agente fez com as mensagens</h3>
+        <div id="chart-agent" class="bars"></div>
+      </div>
+      <div class="card">
+        <h3>Como o time avaliou o agente</h3>
+        <div id="chart-feedback" class="bars"></div>
       </div>
     </div>
   </section>

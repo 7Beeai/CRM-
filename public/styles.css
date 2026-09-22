@@ -102,6 +102,20 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .empty{text-align:center;color:var(--muted);padding:48px 16px}
 
+.agent{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;margin:10px 0;font-size:13.5px}
+.agent-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.agent-badge{background:var(--text);color:var(--surface)}
+.agent-wait,.agent-late{color:var(--muted);background:none;border-style:dashed}
+.agent-late{color:var(--alta);border-color:var(--alta)}
+.agent-reply{margin-top:8px}
+.agent-reply summary{cursor:pointer;color:var(--muted)}
+.agent-reply p{white-space:pre-wrap;margin:8px 0}
+.feedback{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;
+  padding-top:10px;border-top:1px dashed var(--border)}
+.btn-quiet{box-shadow:none;background:none;color:var(--muted)}
+.btn-quiet:hover{color:var(--text)}
+
 @media (max-width:640px){
   .topbar{gap:10px;padding:10px 14px}
   .brand{flex:1}

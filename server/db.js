@@ -45,8 +45,22 @@ CREATE TABLE IF NOT EXISTS messages (
   answered_at   TEXT,
   internal_note TEXT NOT NULL DEFAULT '',
   external_id   TEXT UNIQUE,
+  thread_id     TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+
+  -- Decisão do agente de IA que faz a primeira triagem
+  needs_human          INTEGER NOT NULL DEFAULT 0,
+  agent_name           TEXT NOT NULL DEFAULT '',
+  agent_decision       TEXT,
+  agent_confidence     REAL,
+  agent_intent         TEXT NOT NULL DEFAULT '',
+  agent_reason         TEXT NOT NULL DEFAULT '',
+  agent_reply          TEXT NOT NULL DEFAULT '',
+  agent_suggested_reply TEXT NOT NULL DEFAULT '',
+  agent_decided_at     TEXT,
+  human_feedback       TEXT NOT NULL DEFAULT '',
+  human_feedback_note  TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS activities (
@@ -63,6 +77,33 @@ CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 CREATE INDEX IF NOT EXISTS idx_messages_received ON messages(received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activities_message ON activities(message_id);
 `);
+
+// Migrações para bancos criados antes da integração com o agente.
+const existing = new Set(db.prepare(`PRAGMA table_info(messages)`).all().map((c) => c.name));
+const additions = [
+  ['thread_id', `TEXT`],
+  ['needs_human', `INTEGER NOT NULL DEFAULT 0`],
+  ['agent_name', `TEXT NOT NULL DEFAULT ''`],
+  ['agent_decision', `TEXT`],
+  ['agent_confidence', `REAL`],
+  ['agent_intent', `TEXT NOT NULL DEFAULT ''`],
+  ['agent_reason', `TEXT NOT NULL DEFAULT ''`],
+  ['agent_reply', `TEXT NOT NULL DEFAULT ''`],
+  ['agent_suggested_reply', `TEXT NOT NULL DEFAULT ''`],
+  ['agent_decided_at', `TEXT`],
+  ['human_feedback', `TEXT NOT NULL DEFAULT ''`],
+  ['human_feedback_note', `TEXT NOT NULL DEFAULT ''`]
+];
+for (const [name, type] of additions) {
+  if (!existing.has(name)) db.exec(`ALTER TABLE messages ADD COLUMN ${name} ${type}`);
+}
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_messages_needs_human ON messages(needs_human);
+CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id);
+`);
+
+// O antigo status "relevante" virou "escalada" (precisa de resposta humana).
+db.exec(`UPDATE messages SET status = 'escalada', needs_human = 1 WHERE status = 'relevante'`);
 
 export function log(kind, detail, { messageId = null, contactId = null, actor = 'sistema' } = {}) {
   db.prepare(
