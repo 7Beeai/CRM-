@@ -154,11 +154,27 @@ server/db.js          schema SQLite e log de atividades
 server/api.js         regras de negócio
 server/index.js       servidor HTTP e rotas
 server/seed.js        dados de exemplo
+public/tokens.css     tokens do design (cores, espaço, raios, fontes)
+public/components.css componentes do design (classes sb-*)
+public/styles.css     camada da aplicação, só com tokens
 public/               interface web (HTML, CSS e JS puros)
 scripts/              agente de exemplo para testar a integração
 docs/AGENTE.md        contrato de integração com o agente
 docs/ONBOARDING.md    etapas da esteira e entrada pelo WhatsApp
+7bee-crm-design-handoff/  pacote de design original, com a referência visual
 ```
+
+## Design
+
+O visual segue o pacote em `7bee-crm-design-handoff/`: grafite quente com mel,
+tema escuro por padrão e claro pelo botão da barra superior, que grava a escolha
+no navegador. Toda cor, espaço e raio sai de `public/tokens.css`, então mudar um
+token muda a interface inteira.
+
+O mel marca o que precisa de atenção humana: botão principal, aba ativa, o
+indicador "Precisam de você" e o agente quando ele escala. Verde é positivo,
+vermelho é urgente ou negativo, azul é o que o agente fez sozinho e o neutro é
+o que não tem carga. Cor nunca aparece sozinha: sempre acompanha uma palavra.
 
 ## Antes de expor na internet
 

@@ -42,6 +42,30 @@ function toast(text) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Números no formato brasileiro: 7,3h e não 7.3h.
+const num = (v) => (typeof v === 'number' ? v.toLocaleString('pt-BR') : v);
+
+const CANAIS = {
+  whatsapp: 'WhatsApp', email: 'E-mail', instagram: 'Instagram',
+  site: 'Site', telefone: 'Telefone', chat: 'Chat', outro: 'Outro'
+};
+
+// Ícones de traço 2px, sempre ao lado de um rótulo.
+const traco = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  check: traco('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  flag: traco('<path d="M5 21V4h11l-2 4 2 4H5"/>'),
+  note: traco('<path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4"/>'),
+  x: traco('<path d="M6 6l12 12M18 6L6 18"/>'),
+  plus: traco('<path d="M12 5v14M5 12h14"/>'),
+  robot: traco('<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>'),
+  copy: traco('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5h10"/>'),
+  undo: traco('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
+  arrow: traco('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  eye: traco('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>')
+};
+
 function waitLabel(hours) {
   if (hours < 1) return `há ${Math.max(1, Math.round(hours * 60))} min`;
   if (hours < 48) return `há ${Math.round(hours)} h`;
@@ -71,8 +95,8 @@ function openModal({ title, fields, confirmLabel = 'Salvar' }) {
         return `<label>${esc(f.label)}<select name="${f.name}">${opts}</select></label>`;
       }
       if (f.type === 'checkbox') {
-        return `<label style="grid-auto-flow:column;justify-content:start;align-items:center;gap:8px">
-          <input type="checkbox" name="${f.name}" ${f.value ? 'checked' : ''} style="width:16px;height:16px" />
+        return `<label class="check">
+          <input type="checkbox" name="${f.name}" ${f.value ? 'checked' : ''} />
           ${esc(f.label)}</label>`;
       }
       return `<label>${esc(f.label)}<input type="${f.type ?? 'text'}" name="${f.name}" value="${esc(f.value ?? '')}" ${req} /></label>`;
@@ -98,9 +122,9 @@ function openModal({ title, fields, confirmLabel = 'Salvar' }) {
 function agentBlock(m) {
   if (!m.agent_decision) {
     return m.agente_atrasado
-      ? `<div class="agent agent-late">O agente ainda não decidiu esta mensagem
+      ? `<div class="sb-agent sb-agent--waiting is-late">O agente ainda não decidiu esta mensagem
            (${waitLabel(m.waiting_hours)}). Talvez ele esteja fora do ar.</div>`
-      : `<div class="agent agent-wait">Aguardando a análise do agente.</div>`;
+      : `<div class="sb-agent sb-agent--waiting">Aguardando a análise do agente.</div>`;
   }
 
   const decisao = {
@@ -108,20 +132,26 @@ function agentBlock(m) {
     escalou: 'Escalou para você',
     ignorou: 'Descartou'
   }[m.agent_decision] ?? m.agent_decision;
+  const escalou = Boolean(m.needs_human);
   const conf = m.agent_confidence === null || m.agent_confidence === undefined
-    ? '' : ` · confiança ${Math.round(m.agent_confidence * 100)}%`;
+    ? null : Math.round(m.agent_confidence * 100);
   const texto = m.agent_reply || m.agent_suggested_reply;
   const rotulo = m.agent_reply ? 'Respondeu ao cliente' : 'Rascunho sugerido para você';
 
   return `
-    <div class="agent">
-      <div class="agent-head">
-        <span class="badge agent-badge">${esc(m.agent_name || 'agente')}: ${esc(decisao)}</span>
-        <span class="meta">${esc(m.agent_intent || 'sem categoria')}${conf}</span>
+    <div class="sb-agent ${escalou ? 'sb-agent--escalated' : 'sb-agent--resolved'}">
+      <div class="sb-agent__head">
+        <span class="sb-agent__who">${ICON.robot}${esc(m.agent_name || 'agente')}</span>
+        <span class="sb-badge ${escalou ? 'sb-badge--honey' : 'sb-badge--info'} sb-badge--plain">${esc(decisao)}</span>
+        ${m.agent_intent ? `<span>${esc(m.agent_intent)}</span>` : ''}
+        ${conf === null ? '' : `<span class="sb-conf">confiança
+          <span class="sb-conf__bar"><i style="width:${conf}%"></i></span>
+          <span class="sb-score">${conf}%</span></span>`}
       </div>
-      ${m.agent_reason ? `<div class="meta">Motivo: ${esc(m.agent_reason)}</div>` : ''}
-      ${texto ? `<details class="agent-reply"><summary>${rotulo}</summary><p>${esc(texto)}</p>
-        <button class="btn btn-sm" data-act="copiar" data-id="${m.id}">Copiar texto</button></details>` : ''}
+      ${m.agent_reason ? `<div class="sb-agent__reason"><b>Motivo:</b> ${esc(m.agent_reason)}</div>` : ''}
+      ${texto ? `<details><summary>${rotulo}</summary><p>${esc(texto)}</p>
+        <button type="button" class="sb-btn sb-btn--sm" data-act="copiar" data-id="${m.id}">
+          ${ICON.copy}Copiar texto</button></details>` : ''}
     </div>`;
 }
 
@@ -129,58 +159,90 @@ function feedbackRow(m) {
   if (!m.agent_decision) return '';
   if (m.human_feedback) {
     const rotulo = {
-      acertou: 'você marcou: o agente acertou',
-      deveria_escalar: 'você marcou: deveria ter escalado',
-      nao_precisava_escalar: 'você marcou: não precisava escalar',
-      resposta_ruim: 'você marcou: a resposta ficou ruim'
+      acertou: 'Você marcou: o agente acertou',
+      deveria_escalar: 'Você marcou: deveria ter escalado',
+      nao_precisava_escalar: 'Você marcou: não precisava escalar',
+      resposta_ruim: 'Você marcou: a resposta ficou ruim'
     }[m.human_feedback] ?? m.human_feedback;
-    return `<div class="feedback meta">✓ ${esc(rotulo)}</div>`;
+    return `<div class="sb-feedback">${esc(rotulo)}</div>`;
   }
-  const opcao = (valor, rotulo) =>
-    `<button class="btn btn-sm btn-quiet" data-act="feedback" data-id="${m.id}" data-feedback="${valor}">${rotulo}</button>`;
-  return `<div class="feedback"><span class="meta">O agente acertou?</span>
-    ${opcao('acertou', 'Acertou')}
-    ${m.needs_human ? opcao('nao_precisava_escalar', 'Não precisava me chamar') : opcao('deveria_escalar', 'Deveria ter me chamado')}
+  const opcao = (valor, rotulo, classe = 'sb-btn--ghost', icone = '') =>
+    `<button class="sb-btn sb-btn--sm ${classe}" data-act="feedback" data-id="${m.id}"
+      data-feedback="${valor}">${icone}${rotulo}</button>`;
+  return `<div class="sb-feedback">O agente acertou?
+    ${opcao('acertou', 'Acertou', 'sb-btn--success', ICON.check)}
+    ${m.needs_human
+      ? opcao('nao_precisava_escalar', 'Não precisava me chamar')
+      : opcao('deveria_escalar', 'Deveria ter me chamado')}
     ${m.agent_reply ? opcao('resposta_ruim', 'Resposta ruim') : ''}</div>`;
+}
+
+function whyChips(reasons) {
+  if (!reasons) return '';
+  const chips = reasons.split(' · ').map((fator) => {
+    const [, sinal, rotulo] = fator.match(/^([+-]\d+)\s+(.*)$/) ?? [null, '', fator];
+    return `<span>${sinal ? `<b>${esc(sinal)}</b> ` : ''}${esc(rotulo)}</span>`;
+  }).join('');
+  return `<div class="sb-why">Por que priorizar: ${chips}</div>`;
+}
+
+function iniciaisDe(nome) {
+  const partes = String(nome ?? '').trim().split(/\s+/).slice(0, 2);
+  return partes.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
 }
 
 function messageCard(m) {
   const done = ['respondida', 'arquivada', 'auto_respondida'].includes(m.status);
-  const statusBadge = {
-    triagem: '<span class="badge baixa">Em análise do agente</span>',
-    escalada: '<span class="badge alta">Precisa de você</span>',
-    auto_respondida: '<span class="badge ok">Agente respondeu</span>',
-    respondida: '<span class="badge ok">Respondida</span>',
-    arquivada: '<span class="badge baixa">Descartada</span>'
+  const nome = m.contact_name ?? m.sender_name;
+
+  const prioridade = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }[m.priority] ?? m.priority;
+  const prioBadge = `<span class="sb-badge ${m.priority === 'alta' ? 'sb-badge--danger' : ''} sb-badge--plain">${prioridade}</span>`;
+  const status = {
+    triagem: '<span class="sb-badge">Em análise do agente</span>',
+    escalada: '<span class="sb-badge sb-badge--honey">Precisa de você</span>',
+    auto_respondida: '<span class="sb-badge sb-badge--info">Agente respondeu</span>',
+    respondida: '<span class="sb-badge sb-badge--success">Respondida</span>',
+    arquivada: '<span class="sb-badge">Descartada</span>'
   }[m.status] ?? '';
 
-  const actions = done
-    ? `<button class="btn btn-sm" data-act="reabrir" data-id="${m.id}">Assumir de volta</button>`
-    : `<button class="btn btn-sm btn-primary" data-act="responder" data-id="${m.id}">Marcar respondida</button>
-       ${m.status === 'triagem' ? `<button class="btn btn-sm" data-act="escalar" data-id="${m.id}">Trazer para mim</button>` : ''}
-       <button class="btn btn-sm" data-act="arquivar" data-id="${m.id}">Descartar</button>`;
+  const regua = m.priority === 'alta' ? '' : m.priority === 'media' ? ' sb-msg__prio--mid' : ' sb-msg__prio--low';
+  const org = [m.contact_company, m.is_customer ? 'cliente ativo' : null].filter(Boolean).join(' · ');
+
+  const acoes = done
+    ? `<button class="sb-btn" data-act="reabrir" data-id="${m.id}">${ICON.undo}Assumir de volta</button>`
+    : `<button class="sb-btn sb-btn--primary" data-act="responder" data-id="${m.id}">${ICON.check}Marcar respondida</button>
+       ${m.status === 'triagem'
+        ? `<button class="sb-btn" data-act="escalar" data-id="${m.id}">${ICON.arrow}Trazer para mim</button>` : ''}
+       <button class="sb-btn" data-act="prioridade" data-id="${m.id}">${ICON.flag}Prioridade</button>
+       <button class="sb-btn" data-act="nota" data-id="${m.id}">${ICON.note}Nota</button>
+       <button class="sb-btn sb-btn--danger" data-act="arquivar" data-id="${m.id}">${ICON.x}Descartar</button>`;
 
   return `
-  <article class="msg ${done ? 'is-done' : ''}" data-priority="${m.priority}">
-    <div class="msg-head">
-      <strong>${esc(m.contact_name ?? m.sender_name)}</strong>
-      ${m.contact_company ? `<span class="meta">· ${esc(m.contact_company)}</span>` : ''}
-      <span class="badge ${m.priority}">${m.priority === 'media' ? 'média' : m.priority} · ${m.score}</span>
-      ${statusBadge}
-      ${m.overdue ? '<span class="badge late">Atrasada</span>' : ''}
-      <span class="meta" style="margin-left:auto">${esc(m.channel)} · ${waitLabel(m.waiting_hours)}</span>
+  <article class="sb-msg ${done ? 'is-done' : ''}">
+    <span class="sb-msg__prio${regua}" aria-hidden="true"></span>
+    <div class="sb-msg__head">
+      <span class="sb-avatar">${esc(iniciaisDe(nome))}</span>
+      <div class="sb-msg__who">
+        <span class="sb-msg__name">${esc(nome)}</span>
+        ${org ? `<span class="sb-msg__org">${esc(org)}</span>` : ''}
+      </div>
+      <div class="sb-msg__meta">
+        ${prioBadge}
+        <span class="sb-score ${m.score >= 80 ? 'sb-score--high' : ''}">${m.score}</span>
+        ${status}
+        ${m.overdue ? '<span class="sb-badge sb-badge--danger">Fora do prazo</span>' : ''}
+        <span>${esc(CANAIS[m.channel] ?? m.channel)} · ${waitLabel(m.waiting_hours)}</span>
+      </div>
     </div>
-    ${m.subject ? `<div class="meta"><b>${esc(m.subject)}</b></div>` : ''}
-    <p class="msg-body">${esc(m.body)}</p>
+    ${m.subject ? `<div class="sb-msg__org">${esc(m.subject)}</div>` : ''}
+    <p class="sb-msg__text">${esc(m.body)}</p>
     ${agentBlock(m)}
-    <div class="msg-why">Por que priorizar: ${esc(m.reasons || 'sem sinais fortes')}</div>
-    <div class="msg-actions">
-      ${actions}
-      <button class="btn btn-sm" data-act="prioridade" data-id="${m.id}">Prioridade</button>
-      <button class="btn btn-sm" data-act="nota" data-id="${m.id}">Nota</button>
-      <span class="meta" style="margin-left:auto">Responsável: ${esc(m.assigned_to || '—')}</span>
+    ${whyChips(m.reasons)}
+    <div class="sb-msg__actions">
+      ${acoes}
+      <span class="sb-msg__owner">Responsável: <b>${esc(m.assigned_to || 'ninguém')}</b></span>
     </div>
-    ${m.internal_note ? `<div class="msg-note">${esc(m.internal_note)}</div>` : ''}
+    ${m.internal_note ? `<div class="sb-msg__note">${esc(m.internal_note)}</div>` : ''}
     ${feedbackRow(m)}
   </article>`;
 }
@@ -195,33 +257,53 @@ async function renderMessages() {
     : '<div class="empty">Nenhuma mensagem com esses filtros.</div>';
 }
 
+function statCard({ label, value, delta = null, attention = false }) {
+  return `
+    <div class="sb-stat ${attention ? 'sb-stat--attention' : ''}">
+      <span class="sb-stat__value">${esc(value)}</span>
+      <span class="sb-stat__label">${esc(label)}</span>
+      ${delta ? `<span class="sb-stat__delta ${delta.tom}">${esc(delta.texto)}</span>` : ''}
+    </div>`;
+}
+
 async function renderKpis() {
   const d = await apiCall('/dashboard');
+  const horas = `${num(d.tempo_medio_resposta_horas)}h`;
   const cards = [
-    { label: 'Precisam de você', value: d.escaladas, alert: d.escaladas > 0 },
-    { label: 'Fora do prazo', value: d.atrasadas, alert: d.atrasadas > 0 },
+    { label: 'Precisam de você', value: d.escaladas, attention: d.escaladas > 0 },
+    {
+      label: 'Fora do prazo',
+      value: d.atrasadas,
+      delta: d.atrasadas === 0 ? { tom: 'is-up', texto: 'Tudo em dia' } : null
+    },
     { label: 'Aguardando o agente', value: d.aguardando_agente },
     { label: 'Respondidas pelo agente', value: d.auto_respondidas },
     { label: 'Resolvidas sem humano', value: `${d.taxa_automacao}%` },
-    { label: 'Tempo médio de resposta', value: `${d.tempo_medio_resposta_horas}h` }
+    { label: 'Tempo médio de resposta', value: horas }
   ];
-  const html = cards.map((c) =>
-    `<div class="kpi ${c.alert ? 'alert' : ''}"><b>${esc(c.value)}</b><span>${esc(c.label)}</span></div>`).join('');
-  $('#kpis').innerHTML = html;
+  $('#kpis').innerHTML = cards.map(statCard).join('');
 
-  $('#kpis-panel').innerHTML = html +
-    `<div class="kpi"><b>${d.contatos}</b><span>Contatos</span></div>
-     <div class="kpi"><b>${d.clientes}</b><span>Clientes ativos</span></div>`;
+  $('#kpis-panel').innerHTML = cards.map(statCard).join('') +
+    statCard({ label: 'Contatos', value: d.contatos }) +
+    statCard({ label: 'Clientes ativos', value: d.clientes });
+
+  // Contadores das abas de filtro.
+  const contagens = { precisa: d.escaladas, aguardando: d.aguardando_agente, auto: d.auto_respondidas };
+  for (const [chave, valor] of Object.entries(contagens)) {
+    const alvo = $(`[data-count="${chave}"]`);
+    if (alvo) alvo.textContent = valor;
+  }
 
   const bars = (rows, keyName) => {
-    if (!rows.length) return '<div class="meta">Sem dados.</div>';
+    if (!rows.length) return '<div class="sb-msg__org">Sem dados.</div>';
     const max = Math.max(...rows.map((r) => r.n));
     return rows.map((r) => `
       <div class="bar-row"><span>${esc(r[keyName])}</span>
         <span class="bar" style="width:${Math.round((r.n / max) * 100)}%"></span>
-        <span>${r.n}</span></div>`).join('');
+        <span class="n">${r.n}</span></div>`).join('');
   };
-  $('#chart-channel').innerHTML = bars(d.por_canal, 'channel');
+  $('#chart-channel').innerHTML = bars(
+    d.por_canal.map((r) => ({ channel: CANAIS[r.channel] ?? r.channel, n: r.n })), 'channel');
   $('#chart-stage').innerHTML = bars(d.pipeline, 'stage');
 
   const rotuloDecisao = {
@@ -237,7 +319,7 @@ async function renderKpis() {
   };
   $('#chart-feedback').innerHTML = d.feedback_agente.length
     ? bars(d.feedback_agente.map((r) => ({ feedback: rotuloFeedback[r.feedback] ?? r.feedback, n: r.n })), 'feedback')
-    : '<div class="meta">Ninguém avaliou o agente ainda. Use os botões nos cards da triagem.</div>';
+    : '<div class="sb-msg__org">Ninguém avaliou o agente ainda. Use os botões nos cards da triagem.</div>';
 }
 
 async function handleMessageAction(act, id) {
@@ -303,10 +385,12 @@ async function renderContacts() {
       <td><b>${esc(c.name)}</b>${c.tags ? `<div class="meta">${esc(c.tags)}</div>` : ''}</td>
       <td>${esc(c.company || '—')}</td>
       <td class="meta">${esc(c.email || '')}${c.email && c.phone ? '<br>' : ''}${esc(c.phone || '')}</td>
-      <td><span class="badge baixa">${esc(c.stage)}</span></td>
+      <td><span class="sb-badge sb-badge--plain">${esc(c.stage)}</span></td>
       <td>${esc(c.owner || '—')}</td>
-      <td>${c.is_customer ? '<span class="badge ok">sim</span>' : '<span class="meta">não</span>'}</td>
-      <td><button class="btn btn-sm" data-contact="${c.id}">Editar</button></td>
+      <td>${c.is_customer
+        ? '<span class="sb-badge sb-badge--success">Cliente</span>'
+        : '<span class="meta">não</span>'}</td>
+      <td><button class="sb-btn sb-btn--sm" data-contact="${c.id}">Editar</button></td>
     </tr>`).join('')
     : '<tr><td colspan="7" class="empty">Nenhum contato encontrado.</td></tr>';
 }
@@ -336,41 +420,36 @@ async function carregarEtapas() {
   return onb.stages;
 }
 
-function iniciais(nome) {
-  const partes = nome.trim().split(/\s+/).slice(0, 2);
-  return partes.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
-}
-
 function onbCard(o) {
   const progresso = o.total_tarefas ? Math.round((o.tarefas_feitas / o.total_tarefas) * 100) : 0;
   const etapaAtual = onb.stages.findIndex((s) => s.key === o.stage);
   const proxima = onb.stages[etapaAtual + 1];
   const tags = [];
-  if (o.origem === 'whatsapp') tags.push('<span class="badge baixa">veio do WhatsApp</span>');
-  if (o.bloqueada) tags.push('<span class="badge alta">Tarefa travada</span>');
-  if (o.parada) tags.push(`<span class="badge media">Parada há ${o.dias_na_etapa}d</span>`);
+  if (o.origem === 'whatsapp') tags.push('<span class="sb-badge sb-badge--info">Veio do WhatsApp</span>');
+  if (o.bloqueada) tags.push('<span class="sb-badge sb-badge--danger">Tarefa travada</span>');
+  if (o.parada) tags.push(`<span class="sb-badge sb-badge--honey">Parada há ${o.dias_na_etapa}d</span>`);
 
   return `
   <article class="onb" draggable="true" data-id="${o.id}">
-    <div class="onb-top">
-      <span class="avatar">${esc(iniciais(o.franchise_name))}</span>
-      <div class="onb-name">${esc(o.franchise_name)}</div>
+    <div class="onb__top">
+      <span class="sb-avatar" style="width:28px;height:28px;font-size:11px">${esc(iniciaisDe(o.franchise_name))}</span>
+      <span class="onb__name">${esc(o.franchise_name)}</span>
     </div>
-    <div class="onb-meta">
-      ${esc(o.plan || 'sem plano informado')} · há ${o.dias_desde_o_inicio}d
-      ${o.owner ? ` · ${esc(o.owner)}` : ''}
+    <div class="onb__meta">
+      ${esc(o.plan || 'sem plano informado')} · há ${o.dias_desde_o_inicio}d${o.owner ? ` · ${esc(o.owner)}` : ''}
     </div>
-    ${tags.length ? `<div class="onb-tags">${tags.join('')}</div>` : ''}
+    ${tags.length ? `<div class="onb__tags">${tags.join('')}</div>` : ''}
     <div class="progress" title="${o.tarefas_feitas} de ${o.total_tarefas} tarefas">
-      <span style="width:${progresso}%"></span>
+      <i style="width:${progresso}%"></i>
     </div>
-    <div class="onb-actions">
-      <button class="btn btn-sm" data-onb="abrir" data-id="${o.id}">Abrir</button>
+    <div class="onb__actions">
+      <button class="sb-btn sb-btn--sm" data-onb="abrir" data-id="${o.id}">${ICON.eye}Abrir</button>
       ${proxima
-        ? `<button class="btn btn-sm btn-primary" data-onb="avancar" data-id="${o.id}" data-stage="${proxima.key}">
-             ${proxima.key === 'concluido' ? 'Concluir' : 'Avançar'}
+        ? `<button class="sb-btn sb-btn--sm ${proxima.key === 'concluido' ? 'sb-btn--primary' : ''}"
+             data-onb="avancar" data-id="${o.id}" data-stage="${proxima.key}">
+             ${proxima.key === 'concluido' ? `${ICON.check}Concluir` : `${ICON.arrow}Avançar`}
            </button>`
-        : `<button class="btn btn-sm" data-onb="reabrir" data-id="${o.id}">Reabrir</button>`}
+        : `<button class="sb-btn sb-btn--sm" data-onb="reabrir" data-id="${o.id}">${ICON.undo}Reabrir</button>`}
     </div>
   </article>`;
 }
@@ -385,16 +464,16 @@ async function renderOnboarding() {
 
   $('#onb-kpis').innerHTML = [
     { label: 'Em implantação', value: stats.em_andamento },
-    { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, alert: stats.paradas > 0 },
-    { label: 'Com tarefa travada', value: stats.bloqueadas, alert: stats.bloqueadas > 0 },
+    { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, attention: stats.paradas > 0 },
+    { label: 'Com tarefa travada', value: stats.bloqueadas, attention: stats.bloqueadas > 0 },
     { label: 'Concluídas', value: stats.concluidos },
-    { label: 'Dias até concluir', value: stats.dias_medios_para_concluir }
-  ].map((c) => `<div class="kpi ${c.alert ? 'alert' : ''}"><b>${esc(c.value)}</b><span>${esc(c.label)}</span></div>`).join('');
+    { label: 'Dias até concluir', value: num(stats.dias_medios_para_concluir) }
+  ].map(statCard).join('');
 
   $('#onb-board').innerHTML = onb.stages.map((stage) => {
     const cards = lista.filter((o) => o.stage === stage.key);
     return `
-      <section class="col" data-stage="${stage.key}" style="--stage:${stage.color}">
+      <section class="col is-${esc(stage.tone ?? 'neutral')}" data-stage="${stage.key}">
         <header class="col-head"><span class="dot"></span>${esc(stage.label)}
           <span class="count">${cards.length}</span></header>
         <div class="col-body">
@@ -423,7 +502,7 @@ async function abrirOnboarding(id) {
   $('#modal-title').textContent = o.franchise_name;
   $('#modal-confirm').textContent = 'Fechar';
   $('#modal-body').innerHTML = `
-    <div class="meta">Etapa atual: <b>${esc(etapa?.label ?? o.stage)}</b> · há ${o.dias_na_etapa}d nesta etapa
+    <div class="modal-info">Etapa atual: <b>${esc(etapa?.label ?? o.stage)}</b> · há ${o.dias_na_etapa}d nesta etapa
       · ${o.tarefas_feitas} de ${o.total_tarefas} tarefas
       ${o.whatsapp_group_name ? `<br>Grupo: ${esc(o.whatsapp_group_name)}` : ''}
       ${o.notes ? `<br>${esc(o.notes)}` : ''}
@@ -431,20 +510,19 @@ async function abrirOnboarding(id) {
     <div class="tasks">
       ${o.tasks.map((t) => `
         <label class="task ${t.status === 'feito' ? 'done' : ''} ${t.status === 'bloqueado' ? 'blocked' : ''}">
-          <input type="checkbox" data-task="${t.task_key}" ${t.status === 'feito' ? 'checked' : ''}
-            style="width:17px;height:17px" />
-          <span class="task-title">${esc(t.title)}
+          <input type="checkbox" data-task="${t.task_key}" ${t.status === 'feito' ? 'checked' : ''} />
+          <span class="task__title">${esc(t.title)}
             ${t.done_at ? `<small>concluída em ${esc(t.done_at.slice(0, 10).split('-').reverse().join('/'))}</small>` : ''}
-            ${t.status === 'bloqueado' ? '<small>travada</small>' : ''}
+            ${t.status === 'bloqueado' ? '<small>travada, esperando o franqueado</small>' : ''}
           </span>
-          <button type="button" class="btn btn-sm btn-quiet" data-travar="${t.task_key}">
+          <button type="button" class="sb-btn sb-btn--sm sb-btn--ghost" data-travar="${t.task_key}">
             ${t.status === 'bloqueado' ? 'Destravar' : 'Travar'}
           </button>
         </label>`).join('')}
     </div>
-    <div class="onb-actions" style="margin-top:12px">
-      <button type="button" class="btn btn-sm" data-editar="${o.id}">Editar dados</button>
-      <button type="button" class="btn btn-sm" data-pausar="${o.id}">
+    <div class="modal-actions" style="justify-content:flex-start">
+      <button type="button" class="sb-btn sb-btn--sm" data-editar="${o.id}">Editar dados</button>
+      <button type="button" class="sb-btn sb-btn--sm" data-pausar="${o.id}">
         ${o.situacao === 'ativo' ? 'Pausar' : 'Retomar'}
       </button>
     </div>`;
@@ -574,10 +652,30 @@ $('#onb-board').addEventListener('drop', async (e) => {
 
 function switchView(view) {
   state.view = view;
-  $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.view === view));
-  $$('.view').forEach((v) => v.classList.toggle('is-hidden', v.id !== `view-${view}`));
+  $$('.sb-nav__link').forEach((t) => {
+    if (t.dataset.view === view) t.setAttribute('aria-current', 'page');
+    else t.removeAttribute('aria-current');
+  });
+  $$('.view').forEach((v) => { v.hidden = v.id !== `view-${view}`; });
   refresh();
 }
+
+// Tema escuro é o padrão; o claro entra por data-theme no <html>.
+function aplicarTema(tema) {
+  document.documentElement.dataset.theme = tema;
+  $('#theme-label').textContent = tema === 'dark' ? 'Tema claro' : 'Tema escuro';
+  try { localStorage.setItem('crm7bee-tema', tema); } catch { /* navegador sem storage */ }
+}
+
+try {
+  aplicarTema(localStorage.getItem('crm7bee-tema') ?? 'dark');
+} catch {
+  aplicarTema('dark');
+}
+
+$('#theme-toggle').addEventListener('click', () => {
+  aplicarTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
 
 async function refresh() {
   try {
@@ -589,13 +687,13 @@ async function refresh() {
   }
 }
 
-$$('.tab').forEach((tab) => tab.addEventListener('click', () => switchView(tab.dataset.view)));
+$$('.sb-nav__link').forEach((tab) => tab.addEventListener('click', () => switchView(tab.dataset.view)));
 $('#refresh').addEventListener('click', () => { refresh(); toast('Dados atualizados.'); });
 
 $('#status-chips').addEventListener('click', (e) => {
-  const chip = e.target.closest('.chip');
+  const chip = e.target.closest('.sb-tab');
   if (!chip) return;
-  $$('#status-chips .chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+  $$('#status-chips .sb-tab').forEach((c) => c.setAttribute('aria-selected', String(c === chip)));
   state.fila = chip.dataset.view;
   renderMessages();
 });
@@ -672,6 +770,17 @@ $('#contact-table').addEventListener('click', async (e) => {
     renderContacts();
   } catch (err) { toast(err.message); }
 });
+
+// Ícones dos botões fixos da barra e dos cabeçalhos.
+for (const [sel, icone] of [
+  ['#refresh', ICON.undo],
+  ['#new-message', ICON.plus],
+  ['#new-contact', ICON.plus],
+  ['#new-onboarding', ICON.plus]
+]) {
+  const botao = $(sel);
+  if (botao) botao.insertAdjacentHTML('afterbegin', icone);
+}
 
 refresh();
 setInterval(() => { if (!$('#modal').open) refresh(); }, 60000);

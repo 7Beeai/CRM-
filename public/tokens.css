@@ -1,0 +1,73 @@
+/* 7Bee CRM — design tokens
+   Tema escuro é o padrão. Tema claro: <html data-theme="light">. */
+
+:root, [data-theme="dark"] {
+  --bg: #0E0D0B; /* Fundo da página (atrás de tudo). Grafite quente, nunca preto azulado. */
+  --surface: #161410; /* Cards, barra superior, painéis. O chão onde fica quase todo texto. */
+  --surface-raised: #1E1B16; /* Hover de cards, abas inativas, botões secundários, linhas de tabela alternadas. */
+  --surface-sunken: #12100D; /* Campos de texto e selects (afundados em relação ao card). */
+  --border: #2B2720; /* Linhas finas decorativas: contorno de card, divisórias. Não usar como única borda de controle. */
+  --border-control: #6E6552; /* Borda de inputs, selects e botões secundários (≥3:1 sobre surface e bg). */
+  --ink: #F4EFE4; /* Texto principal sobre bg, surface, surface-raised e todos os *-soft. */
+  --ink-muted: #B0A693; /* Texto secundário: empresa do contato, legendas de KPI, 'Motivo:'. Sobre bg, surface, surface-raised e *-soft. */
+  --ink-subtle: #8C8372; /* Metadados discretos (canal, 'há 3 h', placeholder). Só sobre bg, surface e surface-raised. */
+  --honey: #F5A623; /* Mel 7Bee — a cor da marca. Preenchimento de ação principal, aba ativa, indicador 'precisa de você'. No tema claro nunca como texto (use honey-text). */
+  --honey-strong: #FFB940; /* Hover/pressionado do botão principal. */
+  --on-honey: #1A1307; /* Texto e ícones sobre honey e honey-strong. */
+  --honey-soft: #2A2213; /* Fundo do painel do agente quando ele escala para você; fundo de chip de prioridade média. */
+  --honey-text: #FFC56B; /* Texto e ícones cor de mel sobre surface, bg e honey-soft; também o anel de foco. */
+  --success: #52C98F; /* Verde = positivo: 'Acertou', resolvido, respondida, variação boa de KPI. Texto e ícone. */
+  --success-soft: #12291D; /* Fundo de chip/estado positivo (resolvida, agente acertou). */
+  --danger: #F4715F; /* Vermelho = negativo/urgente: prioridade alta, fora do prazo, risco de cancelamento, descartar. */
+  --danger-soft: #33180F; /* Fundo de chip de prioridade alta e de alertas. */
+  --info: #76B4F5; /* Azul = automação/agente: tudo que o agente de IA fez sozinho. Complementar ao mel, transmite confiança técnica. */
+  --info-soft: #13223A; /* Fundo de chip 'Respondida pelo agente' e de etiquetas do agente. */
+  --focus: var(--honey-text); /* Anel de foco de 2px em todo controle interativo (≥3:1 em todas as superfícies). */
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-honey: 0 6px 20px rgba(245,166,35,0.25);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #FAF7F0; /* Fundo da página (atrás de tudo). Grafite quente, nunca preto azulado. */
+  --surface: #FFFFFF; /* Cards, barra superior, painéis. O chão onde fica quase todo texto. */
+  --surface-raised: #F3EEE3; /* Hover de cards, abas inativas, botões secundários, linhas de tabela alternadas. */
+  --surface-sunken: #FFFFFF; /* Campos de texto e selects (afundados em relação ao card). */
+  --border: #E6DFCF; /* Linhas finas decorativas: contorno de card, divisórias. Não usar como única borda de controle. */
+  --border-control: #9A8E76; /* Borda de inputs, selects e botões secundários (≥3:1 sobre surface e bg). */
+  --ink: #1B1812; /* Texto principal sobre bg, surface, surface-raised e todos os *-soft. */
+  --ink-muted: #62594A; /* Texto secundário: empresa do contato, legendas de KPI, 'Motivo:'. Sobre bg, surface, surface-raised e *-soft. */
+  --ink-subtle: #6E6453; /* Metadados discretos (canal, 'há 3 h', placeholder). Só sobre bg, surface e surface-raised. */
+  --honey: #F5A623; /* Mel 7Bee — a cor da marca. Preenchimento de ação principal, aba ativa, indicador 'precisa de você'. No tema claro nunca como texto (use honey-text). */
+  --honey-strong: #E0951A; /* Hover/pressionado do botão principal. */
+  --on-honey: #1A1307; /* Texto e ícones sobre honey e honey-strong. */
+  --honey-soft: #FDF0D5; /* Fundo do painel do agente quando ele escala para você; fundo de chip de prioridade média. */
+  --honey-text: #8A5300; /* Texto e ícones cor de mel sobre surface, bg e honey-soft; também o anel de foco. */
+  --success: #1C7446; /* Verde = positivo: 'Acertou', resolvido, respondida, variação boa de KPI. Texto e ícone. */
+  --success-soft: #E3F3E9; /* Fundo de chip/estado positivo (resolvida, agente acertou). */
+  --danger: #B8321F; /* Vermelho = negativo/urgente: prioridade alta, fora do prazo, risco de cancelamento, descartar. */
+  --danger-soft: #FCE7E2; /* Fundo de chip de prioridade alta e de alertas. */
+  --info: #1D5FA8; /* Azul = automação/agente: tudo que o agente de IA fez sozinho. Complementar ao mel, transmite confiança técnica. */
+  --info-soft: #E4EEFA; /* Fundo de chip 'Respondida pelo agente' e de etiquetas do agente. */
+  --focus: var(--honey-text); /* Anel de foco de 2px em todo controle interativo (≥3:1 em todas as superfícies). */
+  --shadow-card: 0 1px 2px rgba(40,30,10,0.06), 0 8px 24px rgba(40,30,10,0.06);
+  --shadow-honey: 0 6px 16px rgba(224,149,26,0.30);
+  color-scheme: light;
+}
+
+:root {
+  --space-1: 4px; /* Entre ícone e texto; dentro de chips. */
+  --space-2: 8px; /* Entre botões e chips em linha. */
+  --space-3: 12px; /* Padding de chips grandes, gap de grid de KPI. */
+  --space-4: 16px; /* Padding interno de cards e campos; gutter mobile. */
+  --space-5: 20px; /* Padding de cards de mensagem. */
+  --space-6: 24px; /* Entre seções da página. */
+  --space-8: 32px; /* Margem lateral da página no desktop. */
+  --radius-sm: 6px; /* Chips, badges, pontuação. */
+  --radius-md: 10px; /* Botões, campos, painel do agente. */
+  --radius-lg: 16px; /* Cards de KPI e de mensagem. */
+  --radius-pill: 999px; /* Abas de filtro e avatar. */
+  --font-display: "Sora", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}

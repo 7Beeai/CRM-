@@ -1,0 +1,7 @@
+Aplique o redesign do CRM 7Bee descrito na pasta 7bee-crm-design-handoff/ (copie a pasta para a raiz do projeto antes).
+
+1. Leia 7bee-crm-design-handoff/HANDOFF.md inteiro e abra reference/triagem.html como referência visual.
+2. Identifique a stack e onde estão a tela de Triagem, a navegação superior e os estilos globais; me mostre um plano curto antes de editar.
+3. Instale os tokens (tokens.css) e as fontes, depois aplique os componentes na ordem do HANDOFF.
+4. Regras: não altere o logo (🐝 + "CRM 7Bee"), não mude lógica/dados/ações, use só tokens (nenhum hex novo), suporte tema escuro (padrão) e claro via data-theme.
+5. No fim, rode o projeto, compare com reference/triagem.html nos dois temas e confira a checklist de "Critérios de aceite".

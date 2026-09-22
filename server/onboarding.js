@@ -8,13 +8,15 @@ import { db, log } from './db.js';
  * as franquias detectadas no WhatsApp ou cadastradas na mão.
  */
 
+// O tom de cada etapa vira um token no front: mel pede ação humana,
+// verde é positivo, neutro não carrega emoção.
 export const STAGES = [
-  { key: 'nova',         label: 'Nova franquia',              color: '#8a94a6', icon: '✦' },
-  { key: 'openai',       label: 'Cadastro na OpenAI',         color: '#0b8a6b', icon: '⚙' },
-  { key: 'bm_facebook',  label: 'Criação de BM no Facebook',  color: '#2f6fd0', icon: '◈' },
-  { key: 'ctn',          label: 'CTN',                        color: '#b26a00', icon: '▣' },
-  { key: 'teste_agente', label: 'Teste do agente de vendas',  color: '#7d3cc4', icon: '◎' },
-  { key: 'concluido',    label: 'Concluído',                  color: '#1e7a46', icon: '✓' }
+  { key: 'nova',         label: 'Nova franquia',             tone: 'honey' },
+  { key: 'openai',       label: 'Cadastro na OpenAI',        tone: 'neutral' },
+  { key: 'bm_facebook',  label: 'Criação de BM no Facebook', tone: 'neutral' },
+  { key: 'ctn',          label: 'CTN',                       tone: 'neutral' },
+  { key: 'teste_agente', label: 'Teste do agente de vendas', tone: 'neutral' },
+  { key: 'concluido',    label: 'Concluído',                 tone: 'success' }
 ];
 
 // As tarefas são as etapas do meio: as que alguém precisa executar.

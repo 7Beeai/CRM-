@@ -1,47 +1,67 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CRM 7Bee</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🐝</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@600&display=swap" />
+<link rel="stylesheet" href="/tokens.css" />
+<link rel="stylesheet" href="/components.css" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-<header class="topbar">
-  <div class="brand"><span aria-hidden="true">🐝</span> CRM 7Bee</div>
-  <nav class="tabs" role="tablist">
-    <button class="tab is-active" data-view="triagem" role="tab">Triagem de mensagens</button>
-    <button class="tab" data-view="onboarding" role="tab">Onboarding</button>
-    <button class="tab" data-view="contatos" role="tab">Contatos</button>
-    <button class="tab" data-view="painel" role="tab">Painel</button>
-  </nav>
-  <button class="btn btn-ghost" id="refresh" title="Atualizar dados">Atualizar</button>
-</header>
+<body class="sb">
+<nav class="sb-nav">
+  <span class="sb-brand"><span class="sb-brand__logo" aria-hidden="true">🐝</span>CRM 7Bee</span>
+  <div class="sb-nav__links" role="tablist">
+    <button class="sb-nav__link" role="tab" data-view="triagem" aria-current="page">Triagem</button>
+    <button class="sb-nav__link" role="tab" data-view="onboarding">Onboarding</button>
+    <button class="sb-nav__link" role="tab" data-view="contatos">Contatos</button>
+    <button class="sb-nav__link" role="tab" data-view="painel">Painel</button>
+  </div>
+  <div class="sb-nav__end">
+    <button class="sb-btn sb-btn--ghost" id="theme-toggle" title="Alternar entre tema escuro e claro">
+      <span id="theme-label">Tema claro</span>
+    </button>
+    <button class="sb-btn sb-btn--ghost" id="refresh">Atualizar</button>
+  </div>
+</nav>
 
 <main>
   <!-- ------------------------------- TRIAGEM ------------------------------- -->
   <section id="view-triagem" class="view">
-    <div class="kpis" id="kpis"></div>
-
-    <div class="toolbar">
-      <div class="chips" id="status-chips">
-        <button class="chip is-active" data-view="precisa">Precisam de você</button>
-        <button class="chip" data-view="aguardando">Aguardando o agente</button>
-        <button class="chip" data-view="auto">Respondidas pelo agente</button>
-        <button class="chip" data-view="respondidas">Respondidas por você</button>
-        <button class="chip" data-view="arquivadas">Descartadas</button>
-        <button class="chip" data-view="todas">Todas</button>
+    <header class="page-head">
+      <div>
+        <h1 class="title">Triagem de mensagens</h1>
+        <p class="subtitle">O agente responde o que sabe; aqui fica só o que precisa de você.</p>
       </div>
-      <div class="filters">
-        <input type="search" id="msg-search" placeholder="Buscar texto ou remetente…" />
-        <select id="msg-priority">
+    </header>
+
+    <div class="sb-stats" id="kpis"></div>
+
+    <div class="filter-block">
+      <div class="sb-tabs" id="status-chips" role="tablist">
+        <button class="sb-tab" role="tab" aria-selected="true" data-view="precisa">Precisam de você
+          <span class="sb-tab__count" data-count="precisa">0</span></button>
+        <button class="sb-tab" role="tab" aria-selected="false" data-view="aguardando">Aguardando o agente
+          <span class="sb-tab__count" data-count="aguardando">0</span></button>
+        <button class="sb-tab" role="tab" aria-selected="false" data-view="auto">Respondidas pelo agente
+          <span class="sb-tab__count" data-count="auto">0</span></button>
+        <button class="sb-tab" role="tab" aria-selected="false" data-view="respondidas">Respondidas por você</button>
+        <button class="sb-tab" role="tab" aria-selected="false" data-view="arquivadas">Descartadas</button>
+        <button class="sb-tab" role="tab" aria-selected="false" data-view="todas">Todas</button>
+      </div>
+      <div class="sb-toolbar">
+        <input type="search" id="msg-search" class="sb-field sb-field--grow" placeholder="Buscar texto ou remetente…" />
+        <select id="msg-priority" class="sb-field">
           <option value="">Toda prioridade</option>
           <option value="alta">Alta</option>
           <option value="media">Média</option>
           <option value="baixa">Baixa</option>
         </select>
-        <select id="msg-channel">
+        <select id="msg-channel" class="sb-field">
           <option value="">Todo canal</option>
           <option value="whatsapp">WhatsApp</option>
           <option value="email">E-mail</option>
@@ -51,11 +71,11 @@
           <option value="chat">Chat</option>
           <option value="outro">Outro</option>
         </select>
-        <select id="msg-sort">
+        <select id="msg-sort" class="sb-field">
           <option value="score">Ordenar por relevância</option>
           <option value="recente">Ordenar por mais recente</option>
         </select>
-        <button class="btn" id="new-message">+ Registrar mensagem</button>
+        <button class="sb-btn sb-btn--primary" id="new-message">Registrar mensagem</button>
       </div>
     </div>
 
@@ -63,48 +83,52 @@
   </section>
 
   <!-- ----------------------------- ONBOARDING ----------------------------- -->
-  <section id="view-onboarding" class="view is-hidden">
-    <div class="section-head">
+  <section id="view-onboarding" class="view" hidden>
+    <header class="page-head">
       <div>
-        <h1>Onboarding de franquias</h1>
-        <p class="meta">Esteira de implantação. Arraste o card ou use o botão para avançar de etapa.</p>
+        <h1 class="title">Onboarding de franquias</h1>
+        <p class="subtitle">Esteira de implantação. Arraste o card ou use o botão para avançar de etapa.</p>
       </div>
-      <button class="btn btn-primary" id="new-onboarding">+ Nova franquia</button>
-    </div>
+      <button class="sb-btn sb-btn--primary" id="new-onboarding">Nova franquia</button>
+    </header>
 
-    <div class="kpis" id="onb-kpis"></div>
+    <div class="sb-stats" id="onb-kpis"></div>
 
-    <div class="toolbar">
-      <div class="filters">
-        <input type="search" id="onb-search" placeholder="Buscar franquia, responsável ou grupo…" />
-        <select id="onb-situacao">
-          <option value="ativo">Em andamento</option>
-          <option value="pausado">Pausadas</option>
-          <option value="cancelado">Canceladas</option>
-          <option value="todas">Todas</option>
-        </select>
-      </div>
+    <div class="sb-toolbar">
+      <input type="search" id="onb-search" class="sb-field sb-field--grow" placeholder="Buscar franquia, responsável ou grupo…" />
+      <select id="onb-situacao" class="sb-field">
+        <option value="ativo">Em andamento</option>
+        <option value="pausado">Pausadas</option>
+        <option value="cancelado">Canceladas</option>
+        <option value="todas">Todas</option>
+      </select>
     </div>
 
     <div class="board" id="onb-board"></div>
   </section>
 
   <!-- ------------------------------ CONTATOS ------------------------------ -->
-  <section id="view-contatos" class="view is-hidden">
-    <div class="toolbar">
-      <div class="filters">
-        <input type="search" id="contact-search" placeholder="Buscar contato, empresa, e-mail…" />
-        <select id="contact-stage">
-          <option value="">Toda etapa</option>
-          <option value="lead">Lead</option>
-          <option value="qualificado">Qualificado</option>
-          <option value="proposta">Proposta</option>
-          <option value="cliente">Cliente</option>
-          <option value="perdido">Perdido</option>
-        </select>
-        <button class="btn" id="new-contact">+ Novo contato</button>
+  <section id="view-contatos" class="view" hidden>
+    <header class="page-head">
+      <div>
+        <h1 class="title">Contatos</h1>
+        <p class="subtitle">Quem é quem, em que etapa está e quem responde por ele.</p>
       </div>
+      <button class="sb-btn sb-btn--primary" id="new-contact">Novo contato</button>
+    </header>
+
+    <div class="sb-toolbar">
+      <input type="search" id="contact-search" class="sb-field sb-field--grow" placeholder="Buscar contato, empresa, e-mail…" />
+      <select id="contact-stage" class="sb-field">
+        <option value="">Toda etapa</option>
+        <option value="lead">Lead</option>
+        <option value="qualificado">Qualificado</option>
+        <option value="proposta">Proposta</option>
+        <option value="cliente">Cliente</option>
+        <option value="perdido">Perdido</option>
+      </select>
     </div>
+
     <div class="table-wrap">
       <table class="table" id="contact-table">
         <thead>
@@ -116,8 +140,15 @@
   </section>
 
   <!-- ------------------------------- PAINEL ------------------------------- -->
-  <section id="view-painel" class="view is-hidden">
-    <div class="kpis" id="kpis-panel"></div>
+  <section id="view-painel" class="view" hidden>
+    <header class="page-head">
+      <div>
+        <h1 class="title">Painel</h1>
+        <p class="subtitle">Quanto o agente resolve sozinho e onde o time precisa entrar.</p>
+      </div>
+    </header>
+
+    <div class="sb-stats" id="kpis-panel"></div>
     <div class="panel-grid">
       <div class="card">
         <h3>Mensagens abertas por canal</h3>
@@ -144,8 +175,8 @@
     <h2 id="modal-title">Título</h2>
     <div id="modal-body" class="form-grid"></div>
     <footer class="modal-actions">
-      <button class="btn btn-ghost" value="cancel" formnovalidate>Cancelar</button>
-      <button class="btn btn-primary" value="confirm" id="modal-confirm">Salvar</button>
+      <button class="sb-btn sb-btn--ghost" value="cancel" formnovalidate>Cancelar</button>
+      <button class="sb-btn sb-btn--primary" value="confirm" id="modal-confirm">Salvar</button>
     </footer>
   </form>
 </dialog>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../tokens.css"><link rel="stylesheet" href="../components.css"><title>Triagem — referência 7Bee</title><meta charset="utf-8"><style>html,body{margin:0} body{background:var(--bg)} .pad{padding:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}</style></head>
+<body class="sb">
+<nav class="sb-nav">
+<span class="sb-brand"><span class="sb-brand__logo" aria-hidden="true">🐝</span>CRM 7Bee</span>
+<div class="sb-nav__links"><a class="sb-nav__link" aria-current="page" href="#">Triagem</a><a class="sb-nav__link" href="#">Contatos</a><a class="sb-nav__link" href="#">Painel</a></div>
+<div class="sb-nav__end"><button class="sb-btn sb-btn--ghost" onclick="var h=document.documentElement;h.dataset.theme=h.dataset.theme==='light'?'dark':'light'">Alternar tema</button><button class="sb-btn sb-btn--ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>Atualizar</button><span class="sb-avatar" style="width:32px;height:32px;font-size:12px">GU</span></div>
+</nav>
+<main style="padding:28px 32px;display:grid;gap:24px;max-width:1120px">
+<header style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="flex:1"><h1 class="title" style="margin:0;font-family:var(--font-display);font-size:22px;line-height:28px;font-weight:600">Triagem de mensagens</h1><p style="margin:4px 0 0;color:var(--ink-muted);font-size:13px">O agente responde o que sabe; aqui fica só o que precisa de você.</p></div></header>
+<div class="sb-stats">
+<div class="sb-stat sb-stat--attention"><span class="sb-stat__value">4</span><span class="sb-stat__label">Precisam de você</span></div>
+<div class="sb-stat"><span class="sb-stat__value">0</span><span class="sb-stat__label">Fora do prazo</span><span class="sb-stat__delta is-up">Tudo em dia</span></div>
+<div class="sb-stat"><span class="sb-stat__value">0</span><span class="sb-stat__label">Aguardando o agente</span></div>
+<div class="sb-stat"><span class="sb-stat__value">3</span><span class="sb-stat__label">Respondidas pelo agente</span></div>
+<div class="sb-stat"><span class="sb-stat__value">50%</span><span class="sb-stat__label">Resolvidas sem humano</span><span class="sb-stat__delta is-up">▲ 8 p.p.</span></div>
+<div class="sb-stat"><span class="sb-stat__value">7,3h</span><span class="sb-stat__label">Tempo médio de resposta</span><span class="sb-stat__delta is-down">▼ 1,2h</span></div>
+</div>
+<div style="display:grid;gap:12px">
+<div class="sb-tabs" role="tablist"><button class="sb-tab" aria-selected="true">Precisam de você <span class="sb-tab__count">4</span></button><button class="sb-tab">Aguardando o agente <span class="sb-tab__count">0</span></button><button class="sb-tab">Respondidas pelo agente <span class="sb-tab__count">3</span></button><button class="sb-tab">Respondidas por você</button><button class="sb-tab">Descartadas</button><button class="sb-tab">Todas</button></div>
+<div class="sb-toolbar"><input class="sb-field sb-field--grow" placeholder="Buscar texto ou remetente…"><select class="sb-field"><option>Toda prioridade</option></select><select class="sb-field"><option>Todo canal</option></select><select class="sb-field"><option>Ordenar por relevância</option></select><button class="sb-btn sb-btn--primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Registrar mensagem</button></div>
+</div>
+<div style="display:grid;gap:12px"><article class="sb-msg">
+<span class="sb-msg__prio" aria-hidden="true"></span>
+<div class="sb-msg__head">
+<span class="sb-avatar">ML</span>
+<div class="sb-msg__who"><span class="sb-msg__name">Mariana Lopes</span><span class="sb-msg__org">Docelar Alimentos · cliente ativo</span></div>
+<div class="sb-msg__meta"><span class="sb-badge sb-badge--danger sb-badge--plain">Alta</span><span class="sb-score sb-score--high">99</span><span class="sb-badge sb-badge--honey">Precisa de você</span><span>WhatsApp · há 3 h</span></div>
+</div>
+<p class="sb-msg__text">Gente, o painel está fora do ar desde cedo e preciso fechar o relatório hoje. É urgente!</p>
+<div class="sb-agent sb-agent--escalated">
+<div class="sb-agent__head"><span class="sb-agent__who"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg>agente-cs</span><span class="sb-badge sb-badge--honey sb-badge--plain">Escalou para você</span><span>incidente</span><span class="sb-conf">confiança <span class="sb-conf__bar"><i style="width:93%"></i></span> <span class="sb-score">93%</span></span></div>
+<div class="sb-agent__reason"><b>Motivo:</b> Cliente ativo relatando indisponibilidade com prazo hoje. Precisa de posição humana.</div>
+<details><summary>Rascunho sugerido para você</summary><p>Oi, Mariana! Já estamos verificando o painel com a equipe técnica. Te dou um retorno em até 30 minutos com uma previsão — e, se precisar, envio o relatório manualmente ainda hoje.</p></details>
+</div>
+<div class="sb-why">Por que priorizar: <span><b>+30</b> Intenção de compra</span><span><b>+24</b> Problema técnico</span><span><b>+20</b> Urgência declarada</span><span><b>+15</b> Cliente ativo</span><span><b>+10</b> WhatsApp</span></div>
+<div class="sb-msg__actions">
+<button class="sb-btn sb-btn--primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Marcar respondida</button>
+<button class="sb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-2 4 2 4H5"/></svg>Prioridade</button>
+<button class="sb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4"/></svg>Nota</button>
+<button class="sb-btn sb-btn--danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Descartar</button>
+<span class="sb-msg__owner">Responsável: <b>Guilherme</b></span>
+</div>
+<div class="sb-feedback">O agente acertou? <button class="sb-btn sb-btn--sm sb-btn--success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Acertou</button><button class="sb-btn sb-btn--sm sb-btn--ghost">Não precisava me chamar</button></div>
+</article><article class="sb-msg">
+<span class="sb-msg__prio" aria-hidden="true"></span>
+<div class="sb-msg__head">
+<span class="sb-avatar">CM</span>
+<div class="sb-msg__who"><span class="sb-msg__name">Carla Menezes</span><span class="sb-msg__org">Clínica Vida · risco de cancelamento</span></div>
+<div class="sb-msg__meta"><span class="sb-badge sb-badge--danger sb-badge--plain">Alta</span><span class="sb-score sb-score--high">95</span><span class="sb-badge sb-badge--danger">Fora do prazo</span><span>WhatsApp · há 26 h</span></div>
+</div>
+<p class="sb-msg__text">Estou pensando em cancelar a assinatura, não consegui usar direito no último mês.</p>
+</article></div>
+</main>
+</body>
+</html>
