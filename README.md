@@ -30,6 +30,8 @@ Variáveis de ambiente:
 | `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
 | `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
 | `CRM_ONBOARDING_ALERTA_DIAS` | dias parado até sinalizar a franquia | `7` |
+| `CRM_ONBOARDING_PRAZO_DIAS` | meta de dias para concluir o onboarding | `5` |
+| `CRM_ONBOARDING_PRAZO_UTEIS` | `1` conta a meta em dias úteis | dias corridos |
 
 ## As abas
 
@@ -49,6 +51,11 @@ que anda pelas colunas, e as colunas são as tarefas: cadastro na OpenAI, criaç
 de BM no Facebook, CTN e teste do agente de vendas. Dá para arrastar o card ou
 marcar as tarefas no detalhe, que as duas coisas se mantêm em acordo. Franquias
 paradas há muitos dias ou com tarefa travada ficam sinalizadas.
+
+A esteira acompanha a meta de agilidade do CS: onboarding completo em até 5
+dias. Cada card mostra quanto falta ou se estourou, e as concluídas ganham o
+selo **No prazo** ou **Fora do prazo**. O indicador do topo mostra a porcentagem
+concluída dentro da meta.
 
 Toda franquia da esteira também vira contato do CRM na hora, então as mensagens
 dela chegam identificadas na triagem, com a etapa do onboarding no card e um

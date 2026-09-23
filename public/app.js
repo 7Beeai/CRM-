@@ -63,6 +63,7 @@ const ICON = {
   copy: traco('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5h10"/>'),
   undo: traco('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
   arrow: traco('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  clock: traco('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   eye: traco('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>'),
   chat: traco('<path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z"/>'),
   calendar: traco('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
@@ -85,7 +86,22 @@ const debounce = (fn, ms = 300) => {
 
 /* ---------------------------------- modal --------------------------------- */
 
-function openModal({ title, fields, confirmLabel = 'Salvar' }) {
+// Fecha a janela e espera o evento de fechamento terminar. Sem essa espera, o
+// "close" atrasado da janela anterior cancelava o formulário aberto em seguida.
+function fecharModal() {
+  const dialog = $('#modal');
+  if (!dialog.open) return Promise.resolve();
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => resolve(), { once: true });
+    dialog.close();
+  });
+}
+
+async function openModal({ title, fields, confirmLabel = 'Salvar' }) {
+  await fecharModal();
+  // A janela de detalhe da franquia deixa ouvintes próprios no corpo; o formulário não usa.
+  $('#modal-body').onclick = null;
+  $('#modal-body').onchange = null;
   return new Promise((resolve) => {
     const dialog = $('#modal');
     $('#modal-title').textContent = title;
@@ -514,7 +530,35 @@ async function carregarEtapas() {
   if (onb.stages.length) return onb.stages;
   const meta = await apiCall('/onboarding/meta');
   onb.stages = meta.STAGES;
+  onb.prazoDias = meta.PRAZO_DIAS ?? 5;
+  onb.prazoUteis = Boolean(meta.PRAZO_UTEIS);
+  const texto = `Meta de agilidade: todas as tarefas concluídas em até ${onb.prazoDias} dias${onb.prazoUteis ? ' úteis' : ''} desde o início.`;
+  if ($('#onb-meta')) $('#onb-meta').textContent = texto;
   return onb.stages;
+}
+
+// Selo da meta de agilidade: onboarding completo em até N dias.
+const diasTexto = (n) => {
+  const v = Math.round(Math.abs(n) * 10) / 10;
+  const inteiro = Math.max(1, Math.round(v));
+  return v < 1 ? 'menos de 1 dia' : `${inteiro} ${inteiro === 1 ? 'dia' : 'dias'}`;
+};
+
+function seloDoPrazo(p) {
+  if (!p) return '';
+  const titulo = `Meta: tudo concluído em até ${p.dias} dias${p.uteis ? ' úteis' : ''}`;
+  switch (p.situacao) {
+    case 'no_prazo':
+      return `<span class="sb-badge sb-badge--success sb-badge--plain prazo-ok" title="${titulo}">${ICON.check}No prazo · ${esc(diasTexto(p.dias_decorridos))}</span>`;
+    case 'fora_do_prazo':
+      return `<span class="sb-badge sb-badge--danger sb-badge--plain" title="${titulo}">${ICON.clock}Fora do prazo · ${esc(diasTexto(p.dias_decorridos))}</span>`;
+    case 'estourado':
+      return `<span class="sb-badge sb-badge--danger sb-badge--plain" title="${titulo}">${ICON.clock}Atrasada ${esc(diasTexto(p.dias_restantes))}</span>`;
+    case 'vence_logo':
+      return `<span class="sb-badge sb-badge--honey sb-badge--plain" title="${titulo}">${ICON.clock}Falta ${esc(diasTexto(p.dias_restantes))}</span>`;
+    default:
+      return `<span class="sb-badge sb-badge--plain" title="${titulo}">${ICON.clock}Faltam ${esc(diasTexto(p.dias_restantes))}</span>`;
+  }
 }
 
 function onbCard(o) {
@@ -525,6 +569,8 @@ function onbCard(o) {
   if (o.origem === 'whatsapp') tags.push('<span class="sb-badge sb-badge--info">Veio do WhatsApp</span>');
   if (o.bloqueada) tags.push('<span class="sb-badge sb-badge--danger">Tarefa travada</span>');
   if (o.parada) tags.push(`<span class="sb-badge sb-badge--honey">Parada há ${o.dias_na_etapa}d</span>`);
+  const prazo = seloDoPrazo(o.prazo);
+  if (prazo) tags.unshift(prazo);
 
   return `
   <article class="onb" draggable="true" data-id="${o.id}">
@@ -566,8 +612,23 @@ async function renderOnboarding() {
   ]);
 
   const totalAtivo = stats.em_andamento + stats.concluidos;
+  const pz = stats.prazo;
+  const unidade = `${pz.dias} dias${pz.uteis ? ' úteis' : ''}`;
   $('#onb-kpis').innerHTML = [
-    { label: 'Em implantação', value: stats.em_andamento, tom: 'accent' },
+    {
+      label: 'Em implantação',
+      value: stats.em_andamento,
+      delta: pz.em_andamento_estourado
+        ? { tom: 'is-down', texto: `${pz.em_andamento_estourado} com prazo estourado` }
+        : (stats.em_andamento ? { tom: 'is-up', texto: 'Todas dentro do prazo' } : null)
+    },
+    {
+      label: `No prazo de ${unidade}`,
+      value: pz.concluidas ? `${pz.taxa_no_prazo}%` : '—',
+      tom: pz.concluidas ? 'accent' : '',
+      delta: { tom: '', texto: pz.concluidas ? `${pz.no_prazo} de ${pz.concluidas} concluídas` : 'Nenhuma concluída ainda' },
+      barra: pz.concluidas ? pz.taxa_no_prazo : null
+    },
     { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, tom: stats.paradas > 0 ? 'attention' : '' },
     { label: 'Com tarefa travada', value: stats.bloqueadas, tom: stats.bloqueadas > 0 ? 'danger' : '' },
     {
@@ -596,6 +657,39 @@ async function renderOnboarding() {
   }).join('');
 }
 
+// Datas do formulário: o campo mostra o dia local; o banco guarda em UTC.
+const paraData = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const doBanco = (s) => new Date(`${String(s).replace(' ', 'T')}Z`);
+
+function inicioParaEnvio(valor, original) {
+  if (!valor) return undefined;
+  // Sem mudança, mantém o horário exato que já estava salvo.
+  if (original && valor === paraData(doBanco(original))) return undefined;
+  // Franquia nova começando hoje: o servidor usa a hora atual.
+  if (!original && valor === paraData(new Date())) return undefined;
+  const [a, m, d] = valor.split('-').map(Number);
+  // Data escolhida à mão conta do começo do dia, o jeito mais conservador para a meta.
+  return utc(new Date(a, m - 1, d, 0, 0, 0));
+}
+
+function prepararFranquia(form, original) {
+  const { inicio, ...resto } = form;
+  const started = inicioParaEnvio(inicio, original);
+  return started ? { ...resto, started_at: started } : resto;
+}
+
+function textoDoPrazo(o) {
+  const p = o.prazo;
+  if (!p) return '';
+  const inicio = doBanco(o.started_at).toLocaleDateString('pt-BR');
+  const vence = new Date(p.vence_em).toLocaleDateString('pt-BR');
+  const meta = `${p.dias} dias${p.uteis ? ' úteis' : ''}`;
+  const base = `Início em <b>${esc(inicio)}</b> · meta de ${esc(meta)}, até <b>${esc(vence)}</b>`;
+  if (p.situacao === 'no_prazo') return `${base}<br>${seloDoPrazo(p)} Concluída em ${esc(diasTexto(p.dias_decorridos))}.`;
+  if (p.situacao === 'fora_do_prazo') return `${base}<br>${seloDoPrazo(p)} Concluída em ${esc(diasTexto(p.dias_decorridos))}.`;
+  return `${base}<br>${seloDoPrazo(p)}`;
+}
+
 function camposFranquia(o = {}) {
   return [
     { name: 'franchise_name', label: 'Nome da franquia', value: o.franchise_name, required: true },
@@ -605,6 +699,12 @@ function camposFranquia(o = {}) {
     { name: 'owner', label: 'Responsável pela implantação', value: o.owner ?? CS_PADRAO },
     { name: 'whatsapp_group_name', label: 'Nome do grupo no WhatsApp', value: o.whatsapp_group_name },
     { name: 'whatsapp_group_link', label: 'Link de convite do grupo (chat.whatsapp.com/…)', value: o.whatsapp_group_link },
+    {
+      name: 'inicio',
+      label: `Início do onboarding (a meta de ${onb.prazoDias ?? 5} dias conta a partir deste dia)`,
+      type: 'date',
+      value: paraData(o.started_at ? doBanco(o.started_at) : new Date())
+    },
     { name: 'notes', label: 'Observações', type: 'textarea', value: o.notes }
   ];
 }
@@ -618,6 +718,7 @@ async function abrirOnboarding(id) {
   $('#modal-body').innerHTML = `
     <div class="modal-info">Etapa atual: <b>${esc(etapa?.label ?? o.stage)}</b> · há ${o.dias_na_etapa}d nesta etapa
       · ${o.tarefas_feitas} de ${o.total_tarefas} tarefas
+      <br>${textoDoPrazo(o)}
       ${o.whatsapp_group_name ? `<br>Grupo: ${esc(o.whatsapp_group_name)}` : ''}
       ${o.notes ? `<br>${esc(o.notes)}` : ''}
       ${o.whatsapp_link
@@ -657,14 +758,14 @@ async function abrirOnboarding(id) {
           method: 'PATCH',
           body: { status: task.status === 'bloqueado' ? 'pendente' : 'bloqueado', actor: CS_PADRAO }
         });
-        dialog.close();
+        await fecharModal();
         await renderOnboarding();
         abrirOnboarding(id);
       } else if (alvoEditar) {
-        dialog.close();
+        await fecharModal();
         const form = await openModal({ title: `Editar ${o.franchise_name}`, fields: camposFranquia(o) });
         if (form) {
-          await apiCall(`/onboarding/${id}`, { method: 'PATCH', body: { ...form, actor: CS_PADRAO } });
+          await apiCall(`/onboarding/${id}`, { method: 'PATCH', body: { ...prepararFranquia(form, o.started_at), actor: CS_PADRAO } });
           toast('Franquia atualizada.');
         }
         await renderOnboarding();
@@ -706,7 +807,7 @@ $('#new-onboarding').addEventListener('click', async () => {
   });
   if (!form) return;
   try {
-    const criada = await apiCall('/onboarding', { method: 'POST', body: { ...form, actor: CS_PADRAO } });
+    const criada = await apiCall('/onboarding', { method: 'POST', body: { ...prepararFranquia(form), actor: CS_PADRAO } });
     toast(`${criada.franchise_name} entrou na esteira.`);
     await renderOnboarding();
   } catch (err) { toast(err.message); }

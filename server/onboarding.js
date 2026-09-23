@@ -29,6 +29,56 @@ const STAGE_KEYS = STAGES.map((s) => s.key);
 const TASK_STATUSES = ['pendente', 'feito', 'bloqueado'];
 const PARADO_DIAS = Number(process.env.CRM_ONBOARDING_ALERTA_DIAS ?? 7);
 
+/* ------------------------------ prazo do onboarding ---------------------------
+   Meta do bônus de agilidade do CS: todas as tarefas concluídas em até 5 dias,
+   contados do início do onboarding até a conclusão.
+   Dias corridos por padrão; CRM_ONBOARDING_PRAZO_UTEIS=1 pula sábados e domingos. */
+export const PRAZO_DIAS = Number(process.env.CRM_ONBOARDING_PRAZO_DIAS ?? 5);
+export const PRAZO_UTEIS = process.env.CRM_ONBOARDING_PRAZO_UTEIS === '1';
+// Fuso usado para saber se um dia é fim de semana (Brasília, sem horário de verão).
+const FUSO_HORAS = Number(process.env.CRM_FUSO_HORAS ?? -3);
+const DIA = 8.64e7;
+
+export function prazoFinal(inicio) {
+  const comeco = typeof inicio === 'number' ? inicio : parse(inicio);
+  if (!PRAZO_UTEIS) return comeco + PRAZO_DIAS * DIA;
+  let fim = comeco;
+  let contados = 0;
+  while (contados < PRAZO_DIAS) {
+    fim += DIA;
+    const diaDaSemana = new Date(fim + FUSO_HORAS * 3.6e6).getUTCDay();
+    if (diaDaSemana !== 0 && diaDaSemana !== 6) contados += 1;
+  }
+  return fim;
+}
+
+function situacaoDoPrazo(row) {
+  const inicio = parse(row.started_at);
+  const vence = prazoFinal(inicio);
+  const fim = row.concluded_at ? parse(row.concluded_at) : Date.now();
+  const decorridos = Math.max(0, (fim - inicio) / DIA);
+  const base = {
+    dias: PRAZO_DIAS,
+    uteis: PRAZO_UTEIS,
+    vence_em: new Date(vence).toISOString(),
+    dias_decorridos: Math.round(decorridos * 10) / 10
+  };
+  if (row.concluded_at) {
+    const dentro = parse(row.concluded_at) <= vence;
+    return { ...base, situacao: dentro ? 'no_prazo' : 'fora_do_prazo', dentro };
+  }
+  const restante = (vence - Date.now()) / DIA;
+  let situacao = 'em_dia';
+  if (restante < 0) situacao = 'estourado';
+  else if (restante <= 1) situacao = 'vence_logo';
+  return {
+    ...base,
+    situacao,
+    dentro: null,
+    dias_restantes: Math.round(restante * 10) / 10
+  };
+}
+
 const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
 /* ------------------------------ links do WhatsApp ----------------------------- */
@@ -92,7 +142,8 @@ function decorate(row) {
     bloqueada: tasks.some((t) => t.status === 'bloqueado'),
     dias_desde_o_inicio: Math.floor((Date.now() - parse(row.started_at)) / 8.64e7),
     dias_na_etapa: diasNaEtapa,
-    parada: row.stage !== 'concluido' && row.situacao === 'ativo' && diasNaEtapa >= PARADO_DIAS
+    parada: row.stage !== 'concluido' && row.situacao === 'ativo' && diasNaEtapa >= PARADO_DIAS,
+    prazo: situacaoDoPrazo(row)
   };
 }
 
@@ -175,6 +226,12 @@ function sincronizarContato(onboarding, { actor = 'sistema' } = {}) {
 export function createOnboarding(input = {}) {
   const nome = (input.franchise_name ?? '').trim();
   if (!nome) throw bad('O nome da franquia é obrigatório.');
+  if (input.started_at !== undefined && input.started_at !== null && input.started_at !== '') {
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(input.started_at))) throw bad('Data de início inválida.');
+    if (parse(String(input.started_at)) > Date.now() + 60000) throw bad('A data de início não pode estar no futuro.');
+  } else {
+    input = { ...input, started_at: undefined };
+  }
   if (input.stage && !STAGE_KEYS.includes(input.stage)) throw bad('Etapa inválida.');
 
   if (input.whatsapp_group_id) {
@@ -210,11 +267,23 @@ export function createOnboarding(input = {}) {
 export function updateOnboarding(id, patch = {}) {
   getOnboarding(id);
   const campos = ['franchise_name', 'contact_name', 'phone', 'plan', 'owner', 'notes',
-    'whatsapp_group_name', 'whatsapp_group_link', 'situacao'];
+    'whatsapp_group_name', 'whatsapp_group_link', 'situacao', 'started_at'];
   const sets = [];
   const args = [];
+  const atual = db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id);
   for (const f of campos) {
     if (patch[f] === undefined) continue;
+    if (f === 'started_at') {
+      // O prazo do bônus conta daqui, então a data precisa ser válida e plausível.
+      const valor = String(patch[f]);
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(valor)) throw bad('Data de início inválida.');
+      if (parse(valor) > Date.now() + 60000) throw bad('A data de início não pode estar no futuro.');
+      if (atual.concluded_at && valor > atual.concluded_at) throw bad('A data de início não pode ser depois da conclusão.');
+      if (valor === atual.started_at) continue;
+      sets.push('started_at = ?');
+      args.push(valor);
+      continue;
+    }
     if (f === 'whatsapp_group_link') {
       const link = linkDoGrupo(patch[f]);
       if (patch[f] && !link) throw bad('O link do grupo precisa ser um convite do WhatsApp (chat.whatsapp.com).');
@@ -385,7 +454,23 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
     ).get(...fora.args).n
     : 0;
 
+  const concluidasNoPeriodo = db.prepare(
+    `SELECT * FROM onboardings WHERE concluded_at IS NOT NULL AND situacao <> 'cancelado'${f.sql}`
+  ).all(...f.args).map((r) => situacaoDoPrazo(r));
+  const noPrazo = concluidasNoPeriodo.filter((p) => p.dentro).length;
+  const emAndamento = ativos.filter((o) => o.stage !== 'concluido');
+
   return {
+    prazo: {
+      dias: PRAZO_DIAS,
+      uteis: PRAZO_UTEIS,
+      concluidas: concluidasNoPeriodo.length,
+      no_prazo: noPrazo,
+      fora_do_prazo: concluidasNoPeriodo.length - noPrazo,
+      taxa_no_prazo: concluidasNoPeriodo.length ? Math.round((noPrazo / concluidasNoPeriodo.length) * 100) : 0,
+      em_andamento_estourado: emAndamento.filter((o) => o.prazo.situacao === 'estourado').length,
+      em_andamento_vence_logo: emAndamento.filter((o) => o.prazo.situacao === 'vence_logo').length
+    },
     etapas: STAGES.map((s) => ({ ...s, n: porEtapa[s.key] ?? 0 })),
     em_andamento: ativos.filter((o) => o.stage !== 'concluido').length,
     paradas: ativos.filter((o) => o.parada).length,
@@ -397,4 +482,4 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
   };
 }
 
-export const onboardingMeta = { STAGES, TASK_TEMPLATE, TASK_STATUSES, PARADO_DIAS };
+export const onboardingMeta = { STAGES, TASK_TEMPLATE, TASK_STATUSES, PARADO_DIAS, PRAZO_DIAS, PRAZO_UTEIS };

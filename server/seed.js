@@ -58,7 +58,8 @@ const franquias = [
   { franchise_name: 'Auto Center Silva', contact_name: 'Denilson Silva', phone: '+5511970002222', started_at: diasAtras(9) },
   { franchise_name: 'Clínica Sorriso', contact_name: 'Bruno Rocha', phone: '+5511970003333', started_at: diasAtras(16), whatsapp_group_link: 'https://chat.whatsapp.com/ExemploClinicaSorriso' },
   { franchise_name: 'Estética Elaine', contact_name: 'Elaine Faria', phone: '+5511970004444', started_at: diasAtras(24) },
-  { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', started_at: diasAtras(31) }
+  { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', started_at: diasAtras(31) },
+  { franchise_name: 'Sorveteria Gelato', contact_name: 'Renata Lima', phone: '+5511970006666', started_at: diasAtras(4) }
 ];
 const abertas = franquias.map((f) => createOnboarding({ ...f, owner: 'Guilherme' }));
 
@@ -78,6 +79,8 @@ setTask(abertas[3].id, 'openai', { status: 'feito', actor: 'Guilherme' });
 setTask(abertas[3].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
 setTask(abertas[3].id, 'ctn', { status: 'bloqueado', note: 'Esperando documento do franqueado.', actor: 'Guilherme' });
 moveStage(abertas[4].id, 'concluido', { actor: 'Guilherme' });
+// Concluída em 4 dias: dentro do prazo de 5 dias do bônus.
+moveStage(abertas[5].id, 'concluido', { actor: 'Guilherme' });
 
 console.log(`Onboarding: ${franquias.length + 1} franquias na esteira.`);
 console.log(`Seed concluído: ${contacts.length} contatos, ${messages.length} mensagens e ${decisoes.length} decisões do agente.`);

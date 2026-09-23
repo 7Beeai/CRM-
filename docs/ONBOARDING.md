@@ -31,6 +31,45 @@ travadas, sem sumir da esteira.
 Franquias paradas na mesma etapa por sete dias ou mais aparecem com aviso. Mude
 esse limite pela variável `CRM_ONBOARDING_ALERTA_DIAS`.
 
+## Meta de agilidade: 5 dias
+
+A meta do bônus de agilidade do CS é concluir todas as tarefas do onboarding em
+até 5 dias. O prazo conta da data de início da franquia até a conclusão da
+última tarefa.
+
+Cada card mostra onde a franquia está em relação à meta:
+
+| Situação | Selo no card |
+| --- | --- |
+| Em andamento, com folga | Faltam 3 dias |
+| Em andamento, falta menos de 1 dia | Falta menos de 1 dia (amarelo) |
+| Em andamento, passou da meta | Atrasada 4 dias (vermelho) |
+| Concluída dentro da meta | No prazo · 4 dias (verde, com brilho) |
+| Concluída depois da meta | Fora do prazo · 31 dias (vermelho) |
+
+O indicador **No prazo de 5 dias** mostra a porcentagem das franquias concluídas
+dentro da meta, por exemplo "3 de 4 concluídas". Ele segue o filtro de período,
+que olha a data de início: escolher "Este mês" mostra as franquias que começaram
+neste mês.
+
+O detalhe da franquia mostra a data de início, até quando vai a meta e em
+quantos dias ela foi concluída.
+
+**A data de início pode ser corrigida** em Editar dados, porque é dela que o prazo
+conta. Serve para quando a franquia é cadastrada no CRM depois de o onboarding
+já ter começado. Uma data escolhida à mão conta do começo daquele dia, e a
+mudança fica registrada no histórico da franquia. Datas no futuro, ou depois da
+conclusão, são recusadas.
+
+Pausar uma franquia não para o relógio da meta.
+
+Para mudar a meta:
+
+| Variável | Para quê | Padrão |
+| --- | --- | --- |
+| `CRM_ONBOARDING_PRAZO_DIAS` | quantos dias a meta dá | `5` |
+| `CRM_ONBOARDING_PRAZO_UTEIS` | `1` conta só dias úteis, pulando sábado e domingo | dias corridos |
+
 ## Entrada automática pelos grupos do WhatsApp
 
 O CRM já tem a porta pronta para isso. Quando um grupo novo é criado no WhatsApp

@@ -139,6 +139,12 @@ a.sb-btn:hover { color: var(--ink); }
 .onb__name { font: 700 14px/18px var(--font-sans); color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
 .onb__meta { font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
 .onb__tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.onb__tags .sb-badge svg, .modal-info .sb-badge svg { width: 12px; height: 12px; flex: none; }
+/* Selos na esteira quebram linha em vez de vazar da coluna. */
+.onb__tags .sb-badge { white-space: normal; height: auto; min-height: 22px; padding-block: 3px; max-width: 100%; }
+/* Onboarding feito dentro da meta: o selo verde ganha brilho, como os dados em destaque. */
+.prazo-ok { box-shadow: 0 0 0 1px var(--success), 0 0 12px -2px var(--success); }
+.modal-info .sb-badge { margin: var(--space-2) var(--space-1) 0 0; }
 .progress { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--accent); box-shadow: var(--bar-glow-accent); }
 .onb__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
