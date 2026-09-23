@@ -54,11 +54,11 @@ setHumanFeedback(criadas[6].id, { feedback: 'acertou', actor: 'Guilherme' });
 const diasAtras = (d) => new Date(Date.now() - d * 8.64e7).toISOString().slice(0, 19).replace('T', ' ');
 
 const franquias = [
-  { franchise_name: 'Padaria Pão Quente', contact_name: 'Jose Martins', phone: '+5511970001111', plan: 'Aceleração em Agendamentos', started_at: diasAtras(2), whatsapp_group_link: 'https://chat.whatsapp.com/ExemploPaoQuente1' },
-  { franchise_name: 'Auto Center Silva', contact_name: 'Denilson Silva', phone: '+5511970002222', plan: 'Aceleração em Agendamentos', started_at: diasAtras(9) },
-  { franchise_name: 'Clínica Sorriso', contact_name: 'Bruno Rocha', phone: '+5511970003333', plan: 'Mentoria Fórmula de Agendamento', started_at: diasAtras(16), whatsapp_group_link: 'https://chat.whatsapp.com/ExemploClinicaSorriso' },
-  { franchise_name: 'Estética Elaine', contact_name: 'Elaine Faria', phone: '+5511970004444', plan: 'Mentoria Fórmula de Agendamento', started_at: diasAtras(24) },
-  { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', plan: 'Programa de Implementação de Agendamentos', started_at: diasAtras(31) }
+  { franchise_name: 'Padaria Pão Quente', contact_name: 'Jose Martins', phone: '+5511970001111', started_at: diasAtras(2), whatsapp_group_link: 'https://chat.whatsapp.com/ExemploPaoQuente1' },
+  { franchise_name: 'Auto Center Silva', contact_name: 'Denilson Silva', phone: '+5511970002222', started_at: diasAtras(9) },
+  { franchise_name: 'Clínica Sorriso', contact_name: 'Bruno Rocha', phone: '+5511970003333', started_at: diasAtras(16), whatsapp_group_link: 'https://chat.whatsapp.com/ExemploClinicaSorriso' },
+  { franchise_name: 'Estética Elaine', contact_name: 'Elaine Faria', phone: '+5511970004444', started_at: diasAtras(24) },
+  { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', started_at: diasAtras(31) }
 ];
 const abertas = franquias.map((f) => createOnboarding({ ...f, owner: 'Guilherme' }));
 
