@@ -84,9 +84,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/health') return send(res, 200, { ok: true });
+    // Logo da abelha: o GIF animado tem prioridade; sem ele, vale a arte parada.
     if (pathname === '/api/marca' && req.method === 'GET') {
-      const gif = await access(join(publicDir, 'assets', 'abelha.gif')).then(() => true, () => false);
-      return send(res, 200, { abelha_gif: gif ? '/assets/abelha.gif' : null });
+      const existe = (nome) => access(join(publicDir, 'assets', nome)).then(() => true, () => false);
+      if (await existe('abelha.gif')) return send(res, 200, { abelha: '/assets/abelha.gif', animada: true });
+      for (const nome of ['abelha.webp', 'abelha.png']) {
+        if (await existe(nome)) return send(res, 200, { abelha: `/assets/${nome}`, animada: false });
+      }
+      return send(res, 200, { abelha: null, animada: false });
     }
     if (pathname === '/api/onboarding/meta' && req.method === 'GET') return send(res, 200, onb.onboardingMeta);
     if (pathname === '/api/onboarding/stats' && req.method === 'GET') return send(res, 200, onb.onboardingStats(q));

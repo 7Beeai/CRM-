@@ -149,10 +149,11 @@ select.sb-field { appearance: none; padding-right: 32px; background-image: linea
 .sb-user svg { width: 16px; height: 16px; color: var(--ink-muted); }
 
 /* ---------- Abelha animada ----------
-   Enquanto o GIF oficial não está em public/assets/abelha.gif, a abelha é o
-   emoji com voo em CSS. Com o GIF no lugar, o app troca sozinho. */
-.sb-bee { display: inline-grid; place-items: center; width: 28px; height: 28px; font-size: 22px; line-height: 1; filter: drop-shadow(0 0 6px rgb(255 241 118 / .35)); animation: sb-bee-voo 3.2s ease-in-out infinite; transform-origin: 50% 60%; }
-.sb-bee img { width: 28px; height: 28px; object-fit: contain; }
+   A arte da abelha fica em public/assets/abelha.webp e voa em CSS. Se o GIF
+   animado for salvo em public/assets/abelha.gif, ele tem prioridade e o voo
+   em CSS desliga, porque o GIF já se movimenta. Sem nenhum arquivo, vale o emoji. */
+.sb-bee { display: inline-grid; place-items: center; width: 32px; height: 32px; font-size: 24px; line-height: 1; filter: drop-shadow(0 0 6px rgb(255 241 118 / .35)); animation: sb-bee-voo 3.2s ease-in-out infinite; transform-origin: 50% 60%; }
+.sb-bee img { display: block; width: 32px; height: 32px; object-fit: contain; }
 .sb-bee.is-gif { animation: none; }
 @keyframes sb-bee-voo {
   0%   { transform: translate(0, 0) rotate(-8deg); }

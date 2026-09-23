@@ -146,7 +146,7 @@ entra vinculada a ele.
 | `POST /api/contacts` | cria contato |
 | `GET/PATCH/DELETE /api/contacts/:id` | detalhe, edição e remoção |
 | `GET /api/dashboard` | indicadores agregados, aceita `desde` e `ate` |
-| `GET /api/marca` | diz se o GIF da abelha está instalado |
+| `GET /api/marca` | qual arquivo da abelha usar e se ele é animado |
 | `GET/POST /api/onboarding` | esteira de onboarding, ver [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
 | `POST /api/onboarding/whatsapp-group` | abre a franquia a partir de um grupo novo do WhatsApp |
 
@@ -188,10 +188,12 @@ O cinza dos rótulos do dashboard (`#6B6B80`) fica abaixo do contraste mínimo d
 leitura, então o CRM usa um tom um pouco mais claro. A diferença é quase
 imperceptível e o texto fica legível.
 
-**A abelha do cabeçalho** voa em CSS enquanto o GIF oficial não chega. Para usar
-o GIF do dashboard, salve o arquivo como `public/assets/abelha.gif` e recarregue a
-página, sem mexer em código. Quem ativa a opção de reduzir movimento no sistema
-vê a abelha parada.
+**A abelha do cabeçalho** é a arte em `public/assets/abelha.webp`, que também é
+o ícone da aba do navegador. Ela voa com uma animação em CSS. Para usar o GIF
+animado original, salve o arquivo como `public/assets/abelha.gif`: ele passa na
+frente da arte parada e o voo em CSS desliga, porque o GIF já se movimenta. Mande
+o GIF pelo repositório, porque o anexo do chat converte a imagem e perde a
+animação. Quem ativa a opção de reduzir movimento no sistema vê a abelha parada.
 
 ## Filtro de período
 

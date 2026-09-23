@@ -924,19 +924,22 @@ function tique() {
 tique();
 setInterval(tique, 1000);
 
-// Abelha: se o GIF oficial estiver em public/assets/abelha.gif, ele entra no lugar do emoji.
-apiCall('/marca').then(({ abelha_gif: gif }) => {
-  if (!gif) return;
+// Logo da abelha. O GIF animado tem movimento próprio, então o voo em CSS
+// desliga. A arte parada (webp ou png) continua voando pelo CSS.
+apiCall('/marca').then(({ abelha, animada }) => {
+  if (!abelha) return;
   const img = new Image();
   img.alt = '';
+  img.decoding = 'async';
   img.onload = () => {
     const bee = $('#bee');
     bee.textContent = '';
-    bee.classList.add('is-gif');
+    bee.classList.add('has-img');
+    bee.classList.toggle('is-gif', Boolean(animada));
     bee.append(img);
   };
-  img.src = gif;
-}).catch(() => { /* sem GIF, fica a abelha animada em CSS */ });
+  img.src = abelha;
+}).catch(() => { /* sem arquivo, fica o emoji animado */ });
 
 // Seletor de período.
 function desenharMenuDoPeriodo() {
