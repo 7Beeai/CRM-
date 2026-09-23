@@ -4,6 +4,7 @@ import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as api from './api.js';
 import * as onb from './onboarding.js';
+import * as whats from './whatsapp.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = join(root, 'public');
@@ -107,6 +108,25 @@ const server = createServer(async (req, res) => {
       return send(res, 201, onb.fromWhatsappGroup(await readJson(req)));
     }
 
+    // Conexão com o WhatsApp do CS pela leitura de QR code.
+    if (pathname.startsWith('/api/whatsapp/')) {
+      const acao = pathname.slice('/api/whatsapp/'.length);
+      if (acao === 'status' && req.method === 'GET') return send(res, 200, await whats.status());
+      if (acao === 'conectar' && req.method === 'POST') return send(res, 200, await whats.conectar());
+      if (acao === 'desconectar' && req.method === 'POST') return send(res, 200, await whats.desconectar());
+      if (acao === 'grupos' && req.method === 'GET') return send(res, 200, whats.listarGrupos());
+      if (acao === 'importar' && req.method === 'POST') {
+        const body = await readJson(req);
+        return send(res, 200, await whats.importar(body.grupos));
+      }
+      if (acao === 'simular-leitura' && req.method === 'POST') return send(res, 200, await whats.simularLeitura());
+      if (acao === 'simular-grupo-novo' && req.method === 'POST') {
+        const body = await readJson(req);
+        return send(res, 200, await whats.simularGrupoNovo(body.nome ?? 'Grupo novo'));
+      }
+      return send(res, 404, { error: 'Rota não encontrada.' });
+    }
+
     const onbMatch = pathname.match(/^\/api\/onboarding\/(\d+)(?:\/(stage|activities|tasks\/[a-z_]+))?$/);
     if (onbMatch) {
       const id = Number(onbMatch[1]);
@@ -176,4 +196,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`CRM 7Bee rodando em http://localhost:${PORT}`);
+  whats.retomarSessao();
 });

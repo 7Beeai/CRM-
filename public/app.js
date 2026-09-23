@@ -766,6 +766,221 @@ $('#onb-board').addEventListener('drop', async (e) => {
   } catch (err) { toast(err.message); }
 });
 
+/* ------------------------------ conexão WhatsApp ----------------------------- */
+
+const whats = { timer: null, status: null, grupos: [], selecao: new Map(), busca: '', soNovos: true, tentativas: 0 };
+
+const formatarNumero = (n) => {
+  const d = String(n ?? '');
+  if (d.length === 13) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  if (d.length === 12) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
+  return d ? `+${d}` : '';
+};
+
+function diasDesde(iso) {
+  if (!iso) return '';
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 8.64e7);
+  if (dias < 1) return 'criado hoje';
+  if (dias < 60) return `criado há ${dias}d`;
+  return `criado em ${new Date(iso).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`;
+}
+
+async function atualizarBotaoWhats() {
+  try {
+    const st = await apiCall('/whatsapp/status');
+    const botao = $('#open-whats');
+    const ligado = st.fase === 'conectado';
+    botao.classList.toggle('is-on', ligado);
+    botao.lastChild.textContent = ligado ? 'WhatsApp conectado' : 'Importar do WhatsApp';
+  } catch { /* a esteira funciona sem o WhatsApp */ }
+}
+
+function pararPolling() {
+  clearTimeout(whats.timer);
+  whats.timer = null;
+}
+
+async function ciclo() {
+  pararPolling();
+  if (!$('#modal-whats').open) return;
+  try {
+    const st = await apiCall('/whatsapp/status');
+    const mudou = st.fase !== whats.status?.fase || st.qr_svg !== whats.status?.qr_svg || st.grupos !== whats.status?.grupos;
+    whats.status = st;
+    if (st.fase === 'conectado' && (mudou || !whats.grupos.length) && st.grupos > 0) {
+      whats.grupos = await apiCall('/whatsapp/grupos');
+    }
+    if (mudou || st.fase !== 'conectado') desenharWhats();
+    // Enquanto espera o celular, ou enquanto os grupos ainda carregam, consulta de novo.
+    const esperando = ['conectando', 'aguardando_qr'].includes(st.fase) || (st.fase === 'conectado' && st.grupos === 0 && whats.tentativas++ < 15);
+    if (esperando) whats.timer = setTimeout(ciclo, 2000);
+  } catch (err) {
+    $('#whats-corpo').innerHTML = `<div class="whats__erro">${esc(err.message)}</div>`;
+  }
+}
+
+function desenharWhats() {
+  const st = whats.status;
+  const corpo = $('#whats-corpo');
+  if (!st) { corpo.innerHTML = '<p>Carregando…</p>'; return; }
+
+  if (st.fase === 'indisponivel') {
+    corpo.innerHTML = `
+      <p>A conexão com o WhatsApp ainda não está instalada neste computador. Na pasta do CRM, rode:</p>
+      <pre class="sb-msg__note">npm install</pre>
+      <p>Depois reinicie o CRM e abra esta janela de novo.</p>`;
+    return;
+  }
+
+  if (st.fase === 'desligado' || st.fase === 'erro') {
+    corpo.innerHTML = `
+      ${st.erro ? `<div class="whats__erro">${esc(st.erro)}</div>` : ''}
+      <p>O CRM se conecta ao WhatsApp do Guilherme como um <b>aparelho conectado</b>, igual ao WhatsApp Web.
+        Ele lê só os <b>nomes dos grupos</b>, a data de criação e quantas pessoas participam. Nenhuma mensagem é lida.</p>
+      <p>Com a conexão ativa, cada grupo novo em que o Guilherme entrar vira uma franquia na coluna Nova franquia.
+        ${st.filtro ? `Só entram grupos cujo nome combina com <b>${esc(st.filtro)}</b>.` : ''}</p>
+      <div class="whats__aviso">A API oficial do WhatsApp não permite ler grupos. Esta conexão funciona como o WhatsApp Web,
+        mas não é oficial, então existe risco de o WhatsApp restringir o número. Muitas operações aceitam esse risco num número dedicado ao atendimento.</div>
+      <div><button class="sb-btn sb-btn--primary" type="button" data-whats="conectar">Gerar QR code</button></div>`;
+    return;
+  }
+
+  if (st.fase === 'conectando') {
+    corpo.innerHTML = '<p>Preparando o QR code…</p>';
+    return;
+  }
+
+  if (st.fase === 'aguardando_qr') {
+    corpo.innerHTML = `
+      <div class="whats__pair">
+        <div class="whats__qr" role="img" aria-label="QR code para conectar o WhatsApp">${st.qr_svg ?? ''}</div>
+        <div style="display:grid;gap:var(--space-3)">
+          <ol class="whats__passos">
+            <li>Abra o <b>WhatsApp</b> no celular do Guilherme.</li>
+            <li>No Android, toque nos <b>três pontos</b>. No iPhone, vá em <b>Configurações</b>.</li>
+            <li>Toque em <b>Aparelhos conectados</b> e depois em <b>Conectar um aparelho</b>.</li>
+            <li>Aponte a câmera para este código.</li>
+          </ol>
+          <p>O código se renova sozinho a cada poucos segundos. Deixe esta janela aberta até conectar.</p>
+          ${st.simulado ? '<div><button class="sb-btn sb-btn--sm" type="button" data-whats="simular">Simular leitura do celular</button></div>' : ''}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Conectado: escolher os grupos que são franquias.
+  const termo = whats.busca.toLowerCase();
+  const visiveis = whats.grupos.filter((g) =>
+    (!whats.soNovos || !g.na_esteira) &&
+    (!termo || `${g.nome} ${g.franquia}`.toLowerCase().includes(termo)));
+  const opcoesEtapa = (sel) => onb.stages.map((e) =>
+    `<option value="${e.key}"${e.key === sel ? ' selected' : ''}>${esc(e.label)}</option>`).join('');
+
+  corpo.innerHTML = `
+    <div class="whats__conectado">
+      <span>Conectado ao número <b>${esc(formatarNumero(st.numero))}</b> · ${st.grupos} grupos encontrados</span>
+      <button class="sb-btn sb-btn--sm sb-btn--danger" type="button" data-whats="desconectar">Desconectar</button>
+    </div>
+    <p>Marque os grupos que são franquias e escolha em que etapa cada uma está hoje. O nome da franquia sai do nome do grupo.</p>
+    <div class="sb-toolbar">
+      <input type="search" class="sb-field sb-field--grow" id="whats-busca" placeholder="Buscar grupo…" value="${esc(whats.busca)}" aria-label="Buscar grupo" />
+      <label class="whats__check"><input type="checkbox" id="whats-sonovos" ${whats.soNovos ? 'checked' : ''} />Só os que não estão na esteira</label>
+    </div>
+    <div class="whats__lista" role="list">
+      ${visiveis.length ? visiveis.map((g) => {
+        const marcado = whats.selecao.has(g.id);
+        return `
+        <div class="whats__row ${marcado ? 'is-on' : ''} ${g.na_esteira ? 'is-off' : ''}" role="listitem">
+          <input type="checkbox" data-grupo="${esc(g.id)}" ${marcado ? 'checked' : ''} ${g.na_esteira ? 'disabled' : ''}
+            aria-label="Importar ${esc(g.nome)}" />
+          <div class="whats__nome">${esc(g.nome)}
+            <small>${g.na_esteira ? 'já está na esteira' : `vira “${esc(g.franquia)}”`} · ${esc(diasDesde(g.criado_em))} · ${g.participantes} pessoas${g.eu_admin ? ' · você é admin' : ''}</small>
+          </div>
+          <select class="sb-field" data-etapa="${esc(g.id)}" ${g.na_esteira ? 'disabled' : ''} aria-label="Etapa de ${esc(g.nome)}">
+            ${opcoesEtapa(whats.selecao.get(g.id) ?? 'nova')}
+          </select>
+        </div>`;
+      }).join('') : '<p>Nenhum grupo com esse filtro.</p>'}
+    </div>
+    <div class="whats__foot">
+      <span><b>${whats.selecao.size}</b> ${whats.selecao.size === 1 ? 'grupo selecionado' : 'grupos selecionados'}</span>
+      <button class="sb-btn sb-btn--primary" type="button" data-whats="importar" ${whats.selecao.size ? '' : 'disabled'}>Importar para a esteira</button>
+    </div>`;
+}
+
+async function abrirWhats() {
+  whats.status = null;
+  whats.grupos = [];
+  whats.selecao.clear();
+  whats.tentativas = 0;
+  desenharWhats();
+  $('#modal-whats').showModal();
+  await carregarEtapas();
+  ciclo();
+}
+
+$('#open-whats').addEventListener('click', abrirWhats);
+$('#whats-fechar').addEventListener('click', () => $('#modal-whats').close());
+$('#modal-whats').addEventListener('close', () => { pararPolling(); atualizarBotaoWhats(); });
+
+$('#whats-corpo').addEventListener('click', async (e) => {
+  const acao = e.target.closest('[data-whats]')?.dataset.whats;
+  if (!acao) return;
+  try {
+    if (acao === 'conectar') {
+      whats.status = await apiCall('/whatsapp/conectar', { method: 'POST' });
+      desenharWhats();
+      ciclo();
+    } else if (acao === 'simular') {
+      await apiCall('/whatsapp/simular-leitura', { method: 'POST' });
+      ciclo();
+    } else if (acao === 'desconectar') {
+      whats.status = await apiCall('/whatsapp/desconectar', { method: 'POST' });
+      whats.grupos = [];
+      whats.selecao.clear();
+      desenharWhats();
+      toast('WhatsApp desconectado. O CRM saiu da lista de aparelhos do celular.');
+    } else if (acao === 'importar') {
+      const grupos = [...whats.selecao].map(([id, stage]) => ({ id, stage }));
+      const r = await apiCall('/whatsapp/importar', { method: 'POST', body: { grupos } });
+      const partes = [`${r.criadas.length} ${r.criadas.length === 1 ? 'franquia importada' : 'franquias importadas'}`];
+      if (r.ja_existiam.length) partes.push(`${r.ja_existiam.length} já estavam na esteira`);
+      if (r.erros.length) partes.push(`${r.erros.length} com erro`);
+      toast(`${partes.join(', ')}.`);
+      whats.selecao.clear();
+      whats.grupos = await apiCall('/whatsapp/grupos');
+      desenharWhats();
+      await renderOnboarding();
+    }
+  } catch (err) { toast(err.message); }
+});
+
+$('#whats-corpo').addEventListener('change', (e) => {
+  const caixa = e.target.closest('input[data-grupo]');
+  const etapa = e.target.closest('select[data-etapa]');
+  if (caixa) {
+    if (caixa.checked) whats.selecao.set(caixa.dataset.grupo, $(`select[data-etapa="${CSS.escape(caixa.dataset.grupo)}"]`)?.value ?? 'nova');
+    else whats.selecao.delete(caixa.dataset.grupo);
+    desenharWhats();
+  } else if (etapa) {
+    // Escolher a etapa já marca o grupo para importar.
+    whats.selecao.set(etapa.dataset.etapa, etapa.value);
+    desenharWhats();
+  } else if (e.target.id === 'whats-sonovos') {
+    whats.soNovos = e.target.checked;
+    desenharWhats();
+  }
+});
+
+$('#whats-corpo').addEventListener('input', debounce((e) => {
+  if (e.target.id !== 'whats-busca') return;
+  whats.busca = e.target.value.trim();
+  desenharWhats();
+  const campo = $('#whats-busca');
+  campo.focus();
+  campo.setSelectionRange(campo.value.length, campo.value.length);
+}, 200));
+
 /* ---------------------------------- setup --------------------------------- */
 
 const SECOES = {
@@ -808,7 +1023,7 @@ $('#theme-toggle').addEventListener('click', () => {
 async function refresh() {
   try {
     if (state.view === 'contatos') await renderContacts();
-    else if (state.view === 'onboarding') await renderOnboarding();
+    else if (state.view === 'onboarding') { await renderOnboarding(); atualizarBotaoWhats(); }
     else await Promise.all([renderMessages(), renderKpis()]);
   } catch (err) {
     toast(err.message);
@@ -905,6 +1120,7 @@ for (const [sel, icone] of [
   ['#new-message', ICON.plus],
   ['#new-contact', ICON.plus],
   ['#new-onboarding', ICON.plus],
+  ['#open-whats', ICON.chat],
   ['#user-chip', ICON.user],
   ['#period-btn', ICON.calendar]
 ]) {

@@ -2,12 +2,20 @@
   "name": "crm-7bee",
   "version": "1.0.0",
   "private": true,
-  "description": "CRM interno 7Bee: triagem de mensagens relevantes, contatos e pipeline.",
+  "description": "CRM interno 7Bee: triagem de mensagens, esteira de onboarding, contatos e conexão com o WhatsApp.",
   "type": "module",
-  "engines": { "node": ">=22.5.0" },
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "start": "node --no-warnings server/index.js",
     "dev": "node --no-warnings --watch server/index.js",
-    "seed": "node --no-warnings server/seed.js"
+    "seed": "node --no-warnings server/seed.js",
+    "start:simulado": "CRM_WHATSAPP_SIMULADO=1 node --no-warnings server/index.js"
+  },
+  "optionalDependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "pino": "^9.6.0",
+    "qrcode": "1.5.4"
   }
 }

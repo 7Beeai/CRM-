@@ -56,6 +56,7 @@
   --shadow-card: 0 1px 0 rgb(255 255 255 / .03) inset, 0 10px 30px rgb(0 0 0 / .45);
   --shadow-accent: 0 0 20px -2px rgb(172 234 72 / .45);
   --backdrop: rgb(4 4 8 / .72);
+  --qr-bg: #FFFFFF; /* Fundo do QR code: o leitor do celular precisa de claro atrás do código, nos dois temas. */
   color-scheme: dark;
 }
 
@@ -112,6 +113,7 @@
   --shadow-card: 0 1px 2px rgb(20 20 28 / .06), 0 8px 24px rgb(20 20 28 / .06);
   --shadow-accent: 0 6px 16px -4px rgb(63 98 18 / .35);
   --backdrop: rgb(20 20 28 / .45);
+  --qr-bg: #FFFFFF;
   color-scheme: light;
 }
 

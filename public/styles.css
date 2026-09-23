@@ -246,6 +246,47 @@ dialog::backdrop { background: var(--backdrop); }
 .modal-info { font: 500 13px/20px var(--font-sans); color: var(--ink-muted); }
 .modal-info b { color: var(--ink); }
 
+/* ------------------------------ conexão WhatsApp ----------------------------- */
+
+#modal-whats { max-width: 760px; }
+.whats { padding: var(--space-5); display: grid; gap: var(--space-4); }
+.whats__head { display: flex; align-items: center; gap: var(--space-3); }
+.whats__head h2 { flex: 1; margin: 0; font: 600 18px/24px var(--font-display); color: var(--ink); }
+.whats p { margin: 0; color: var(--ink-muted); font-size: 13.5px; line-height: 21px; }
+.whats p b { color: var(--ink); }
+.whats__aviso { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--honey-soft); box-shadow: inset 3px 0 0 var(--honey); font-size: 13px; line-height: 20px; color: var(--ink); }
+.whats__erro { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger); font-size: 13px; }
+.whats__pair { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-5); align-items: center; }
+.whats__qr { width: 260px; height: 260px; padding: 12px; border-radius: var(--radius-lg); background: var(--qr-bg); box-shadow: var(--glow-accent); }
+.whats__qr svg { display: block; width: 100%; height: 100%; }
+.whats__passos { margin: 0; padding-left: 20px; display: grid; gap: var(--space-2); color: var(--ink); font-size: 14px; line-height: 21px; }
+.whats__passos b { color: var(--accent-text); }
+.whats__conectado { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.whats__conectado span { flex: 1; font-size: 13.5px; color: var(--ink-muted); }
+.whats__conectado b { color: var(--ink); font-family: var(--font-mono); }
+.whats__lista { display: grid; gap: var(--space-1); max-height: min(46vh, 440px); overflow-y: auto; padding-right: var(--space-1); }
+.whats__row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 190px; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface-raised); }
+.whats__row.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.whats__row.is-off { opacity: .6; }
+.whats__row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
+.whats__nome { font: 600 14px/19px var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+.whats__nome small { display: block; font: 500 12px/16px var(--font-sans); color: var(--ink-subtle); }
+.whats__row select { height: 32px; font-size: 12.5px; }
+.whats__foot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.whats__foot span { flex: 1; font-size: 13px; color: var(--ink-muted); }
+.whats__foot b { color: var(--ink); font-family: var(--font-mono); }
+.whats__check { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--ink-muted); white-space: nowrap; }
+.whats__check input { width: 16px; height: 16px; accent-color: var(--accent); }
+#open-whats.is-on::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+@media (max-width: 720px) {
+  .whats { padding: var(--space-4); }
+  .whats__pair { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .whats__qr { width: min(260px, 100%); height: auto; aspect-ratio: 1; }
+  .whats__row { grid-template-columns: 20px minmax(0, 1fr); }
+  .whats__row select { grid-column: 2; }
+}
+
 /* ---------------------------------- toast ----------------------------------- */
 
 .toast {

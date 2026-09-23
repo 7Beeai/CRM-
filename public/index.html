@@ -103,6 +103,7 @@
   <section id="view-onboarding" class="view" hidden>
     <div class="page-head">
       <h2 class="sb-section sb-section--bar">Indicadores da implantação</h2>
+      <button class="sb-btn" id="open-whats" type="button">Importar do WhatsApp</button>
       <button class="sb-btn sb-btn--primary" id="new-onboarding">Nova franquia</button>
     </div>
     <div class="sb-stats" id="onb-kpis"></div>
@@ -193,6 +194,16 @@
       <button class="sb-btn sb-btn--primary" value="confirm" id="modal-confirm">Salvar</button>
     </footer>
   </form>
+</dialog>
+
+<dialog id="modal-whats" aria-labelledby="whats-titulo">
+  <div class="whats">
+    <header class="whats__head">
+      <h2 id="whats-titulo">WhatsApp do CS</h2>
+      <button class="sb-btn sb-btn--ghost sb-btn--sm" id="whats-fechar" type="button">Fechar</button>
+    </header>
+    <div id="whats-corpo" aria-live="polite"></div>
+  </div>
 </dialog>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

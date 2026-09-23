@@ -5,11 +5,14 @@ triagem: responde sozinho o que consegue resolver e escala para o CS (Guilherme)
 só o que precisa de gente. O CRM é o painel de controle disso, e também pontua
 cada mensagem por conta própria, para que a fila humana venha na ordem certa.
 
-Roda com **zero dependências** — só Node.js 22.5 ou superior (usa o SQLite nativo).
+O núcleo roda **sem dependências**, só com Node.js 22.5 ou superior (usa o
+SQLite nativo). A conexão com o WhatsApp é opcional e é a única parte que pede
+`npm install`.
 
 ## Como rodar
 
 ```bash
+npm install     # só para a conexão com o WhatsApp; o resto não precisa
 npm run seed    # opcional: cria dados de exemplo na primeira vez
 npm start       # http://localhost:3000
 ```
@@ -51,10 +54,10 @@ Toda franquia da esteira também vira contato do CRM na hora, então as mensagen
 dela chegam identificadas na triagem, com a etapa do onboarding no card e um
 atalho que abre o grupo dela no WhatsApp.
 
-Franquias entram na esteira pelo botão **Nova franquia** ou sozinhas, quando um
-grupo novo aparece no WhatsApp do CS. Essa entrada automática depende do provedor
-de WhatsApp que vocês forem usar, e o caminho está explicado em
-[`docs/ONBOARDING.md`](docs/ONBOARDING.md).
+Franquias entram na esteira pelo botão **Nova franquia**, pela importação dos
+grupos do WhatsApp do CS ou sozinhas, quando um grupo novo aparece no WhatsApp
+conectado. A conexão é feita pela leitura de um QR code dentro do próprio CRM;
+o passo a passo e os cuidados estão em [`docs/WHATSAPP.md`](docs/WHATSAPP.md).
 
 **Contatos** guarda quem é quem: empresa, canais, etapa no funil, responsável e
 observações. Marcar alguém como cliente ativo faz as mensagens dessa pessoa
@@ -149,6 +152,7 @@ entra vinculada a ele.
 | `GET /api/marca` | qual arquivo da abelha usar e se ele é animado |
 | `GET/POST /api/onboarding` | esteira de onboarding, ver [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
 | `POST /api/onboarding/whatsapp-group` | abre a franquia a partir de um grupo novo do WhatsApp |
+| `/api/whatsapp/…` | conexão por QR code e importação de grupos, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) |
 
 ## Estrutura
 
@@ -160,6 +164,7 @@ server/api.js         regras de negócio
 server/index.js       servidor HTTP e rotas
 server/seed.js        dados de exemplo
 server/periodo.js     filtro de período compartilhado
+server/whatsapp.js    conexão com o WhatsApp por QR code e importação de grupos
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
 public/styles.css     camada da aplicação, só com tokens
@@ -168,6 +173,7 @@ public/               interface web (HTML, CSS e JS puros)
 scripts/              agente de exemplo para testar a integração
 docs/AGENTE.md        contrato de integração com o agente
 docs/ONBOARDING.md    etapas da esteira e entrada pelo WhatsApp
+docs/WHATSAPP.md      como conectar o WhatsApp do CS e importar as franquias
 7bee-crm-design-handoff/  pacote de design original, com a referência visual
 ```
 
