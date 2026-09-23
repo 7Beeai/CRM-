@@ -1,6 +1,7 @@
 import { db, log } from './db.js';
 import { scoreMessage, dueDateFor } from './relevance.js';
 import { onboardingDoContato, linkDaConversa } from './onboarding.js';
+import { lerPeriodo, filtroPeriodo, foraDoPeriodo } from './periodo.js';
 
 const MESSAGE_STATUSES = ['triagem', 'escalada', 'auto_respondida', 'respondida', 'arquivada'];
 const AGENT_DECISIONS = ['respondeu', 'escalou', 'ignorou'];
@@ -12,9 +13,10 @@ const bad = (msg) => Object.assign(new Error(msg), { status: 400 });
 
 /* ---------------------------------- contatos --------------------------------- */
 
-export function listContacts({ q = '', stage = '' } = {}) {
-  let sql = `SELECT * FROM contacts WHERE 1=1`;
-  const args = [];
+export function listContacts({ q = '', stage = '', desde = '', ate = '' } = {}) {
+  const periodo = filtroPeriodo('created_at', lerPeriodo({ desde, ate }));
+  let sql = `SELECT * FROM contacts WHERE 1=1${periodo.sql}`;
+  const args = [...periodo.args];
   if (q) {
     sql += ` AND (name LIKE ? OR company LIKE ? OR email LIKE ? OR phone LIKE ? OR tags LIKE ?)`;
     args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
@@ -225,12 +227,13 @@ function notifyEscalation(message) {
 }
 
 export function listMessages({ status = '', priority = '', channel = '', assigned_to = '', q = '',
-  sort = 'score', needs_human = '', aguardando_agente = '' } = {}) {
+  sort = 'score', needs_human = '', aguardando_agente = '', desde = '', ate = '' } = {}) {
+  const periodo = filtroPeriodo('m.received_at', lerPeriodo({ desde, ate }));
   let sql = `
     SELECT m.*, c.name AS contact_name, c.company AS contact_company, c.is_customer,
            c.phone AS contact_phone
-    FROM messages m LEFT JOIN contacts c ON c.id = m.contact_id WHERE 1=1`;
-  const args = [];
+    FROM messages m LEFT JOIN contacts c ON c.id = m.contact_id WHERE 1=1${periodo.sql}`;
+  const args = [...periodo.args];
   if (status) { sql += ` AND m.status = ?`; args.push(status); }
   if (needs_human === '1' || needs_human === true) {
     sql += ` AND m.needs_human = 1 AND m.status = 'escalada'`;
@@ -349,47 +352,53 @@ export function messageActivities(id) {
 
 /* --------------------------------- indicadores -------------------------------- */
 
-export function dashboard() {
+export function dashboard({ desde = '', ate = '' } = {}) {
+  const p = lerPeriodo({ desde, ate });
+  const msg = filtroPeriodo('received_at', p);
+  const cont = filtroPeriodo('created_at', p);
   const one = (sql, ...a) => db.prepare(sql).get(...a);
-  const openFilter = `status IN ('triagem','escalada')`;
+  const all = (sql, ...a) => db.prepare(sql).all(...a);
+  // Toda consulta de mensagem recebe o mesmo recorte de período.
+  const M = (where) => `FROM messages WHERE ${where}${msg.sql}`;
+  const aberta = `status IN ('triagem','escalada')`;
+
+  const total = one(`SELECT COUNT(*) n ${M('agent_decision IS NOT NULL')}`, ...msg.args).n;
+  const auto = one(`SELECT COUNT(*) n ${M('agent_decision IS NOT NULL AND needs_human = 0')}`, ...msg.args).n;
+
+  // Rede de segurança: filtrar a fila por data pode esconder trabalho pendente.
+  const fora = foraDoPeriodo('received_at', p);
+  const pendentesFora = p.ativo
+    ? one(`SELECT COUNT(*) n FROM messages WHERE ${aberta}${fora.sql}`, ...fora.args).n
+    : 0;
+
   return {
-    triagem: one(`SELECT COUNT(*) n FROM messages WHERE status = 'triagem'`).n,
-    escaladas: one(`SELECT COUNT(*) n FROM messages WHERE status = 'escalada'`).n,
-    aguardando_agente: one(
-      `SELECT COUNT(*) n FROM messages WHERE status = 'triagem' AND agent_decision IS NULL`
-    ).n,
-    auto_respondidas: one(`SELECT COUNT(*) n FROM messages WHERE status = 'auto_respondida'`).n,
-    alta_prioridade: one(`SELECT COUNT(*) n FROM messages WHERE ${openFilter} AND priority = 'alta'`).n,
-    atrasadas: one(
-      `SELECT COUNT(*) n FROM messages WHERE ${openFilter} AND due_at IS NOT NULL AND due_at < ?`, now()
-    ).n,
+    periodo: { desde: p.desde, ate: p.ate, ativo: p.ativo },
+    triagem: one(`SELECT COUNT(*) n ${M("status = 'triagem'")}`, ...msg.args).n,
+    escaladas: one(`SELECT COUNT(*) n ${M("status = 'escalada'")}`, ...msg.args).n,
+    aguardando_agente: one(`SELECT COUNT(*) n ${M("status = 'triagem' AND agent_decision IS NULL")}`, ...msg.args).n,
+    auto_respondidas: one(`SELECT COUNT(*) n ${M("status = 'auto_respondida'")}`, ...msg.args).n,
+    alta_prioridade: one(`SELECT COUNT(*) n ${M(`${aberta} AND priority = 'alta'`)}`, ...msg.args).n,
+    atrasadas: one(`SELECT COUNT(*) n ${M(`${aberta} AND due_at IS NOT NULL AND due_at < ?`)}`, now(), ...msg.args).n,
     respondidas_hoje: one(
       `SELECT COUNT(*) n FROM messages WHERE status = 'respondida' AND date(answered_at) = date('now')`
     ).n,
     tempo_medio_resposta_horas: Math.round(
       (one(`SELECT AVG((julianday(answered_at) - julianday(received_at)) * 24) v
-            FROM messages WHERE answered_at IS NOT NULL`).v ?? 0) * 10
+            ${M('answered_at IS NOT NULL')}`, ...msg.args).v ?? 0) * 10
     ) / 10,
-    contatos: one(`SELECT COUNT(*) n FROM contacts`).n,
-    clientes: one(`SELECT COUNT(*) n FROM contacts WHERE is_customer = 1`).n,
-    taxa_automacao: (() => {
-      const total = one(`SELECT COUNT(*) n FROM messages WHERE agent_decision IS NOT NULL`).n;
-      if (!total) return 0;
-      const auto = one(`SELECT COUNT(*) n FROM messages WHERE agent_decision IS NOT NULL AND needs_human = 0`).n;
-      return Math.round((auto / total) * 100);
-    })(),
-    feedback_agente: db.prepare(
-      `SELECT human_feedback AS feedback, COUNT(*) n FROM messages
-       WHERE human_feedback <> '' GROUP BY human_feedback ORDER BY n DESC`
-    ).all(),
-    por_decisao_do_agente: db.prepare(
-      `SELECT COALESCE(agent_decision, 'sem decisão') AS decisao, COUNT(*) n
-       FROM messages GROUP BY agent_decision ORDER BY n DESC`
-    ).all(),
-    por_canal: db.prepare(
-      `SELECT channel, COUNT(*) n FROM messages WHERE ${openFilter} GROUP BY channel ORDER BY n DESC`
-    ).all(),
-    pipeline: db.prepare(`SELECT stage, COUNT(*) n FROM contacts GROUP BY stage`).all()
+    contatos: one(`SELECT COUNT(*) n FROM contacts WHERE 1=1${cont.sql}`, ...cont.args).n,
+    clientes: one(`SELECT COUNT(*) n FROM contacts WHERE is_customer = 1${cont.sql}`, ...cont.args).n,
+    taxa_automacao: total ? Math.round((auto / total) * 100) : 0,
+    feedback_agente: all(
+      `SELECT human_feedback AS feedback, COUNT(*) n ${M("human_feedback <> ''")}
+       GROUP BY human_feedback ORDER BY n DESC`, ...msg.args),
+    por_decisao_do_agente: all(
+      `SELECT COALESCE(agent_decision, 'sem decisão') AS decisao, COUNT(*) n ${M('1=1')}
+       GROUP BY agent_decision ORDER BY n DESC`, ...msg.args),
+    por_canal: all(
+      `SELECT channel, COUNT(*) n ${M(aberta)} GROUP BY channel ORDER BY n DESC`, ...msg.args),
+    pipeline: all(`SELECT stage, COUNT(*) n FROM contacts WHERE 1=1${cont.sql} GROUP BY stage`, ...cont.args),
+    pendentes_fora_do_periodo: pendentesFora
   };
 }
 

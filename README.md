@@ -145,7 +145,8 @@ entra vinculada a ele.
 | `GET /api/contacts` | lista com filtros `q` e `stage` |
 | `POST /api/contacts` | cria contato |
 | `GET/PATCH/DELETE /api/contacts/:id` | detalhe, edição e remoção |
-| `GET /api/dashboard` | indicadores agregados |
+| `GET /api/dashboard` | indicadores agregados, aceita `desde` e `ate` |
+| `GET /api/marca` | diz se o GIF da abelha está instalado |
 | `GET/POST /api/onboarding` | esteira de onboarding, ver [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
 | `POST /api/onboarding/whatsapp-group` | abre a franquia a partir de um grupo novo do WhatsApp |
 
@@ -158,9 +159,11 @@ server/db.js          schema SQLite e log de atividades
 server/api.js         regras de negócio
 server/index.js       servidor HTTP e rotas
 server/seed.js        dados de exemplo
+server/periodo.js     filtro de período compartilhado
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
 public/styles.css     camada da aplicação, só com tokens
+public/assets/        arquivos da marca, como o GIF da abelha
 public/               interface web (HTML, CSS e JS puros)
 scripts/              agente de exemplo para testar a integração
 docs/AGENTE.md        contrato de integração com o agente
@@ -170,15 +173,41 @@ docs/ONBOARDING.md    etapas da esteira e entrada pelo WhatsApp
 
 ## Design
 
-O visual segue o pacote em `7bee-crm-design-handoff/`: grafite quente com mel,
-tema escuro por padrão e claro pelo botão da barra superior, que grava a escolha
-no navegador. Toda cor, espaço e raio sai de `public/tokens.css`, então mudar um
-token muda a interface inteira.
+O visual segue o Dashboard CDT: fundo preto azulado, cards escuros com um
+reflexo discreto no topo, rótulos pequenos em fonte mono espaçada e números
+grandes. A cor da marca é o lima neon e o amarelo neon marca o que pede atenção
+humana. Tema escuro por padrão, claro pelo botão da barra, com a escolha
+guardada no navegador.
 
-O mel marca o que precisa de atenção humana: botão principal, aba ativa, o
-indicador "Precisam de você" e o agente quando ele escala. Verde é positivo,
-vermelho é urgente ou negativo, azul é o que o agente fez sozinho e o neutro é
-o que não tem carga. Cor nunca aparece sozinha: sempre acompanha uma palavra.
+Toda cor, espaço, raio e brilho sai de `public/tokens.css`, então mudar um token
+muda a interface inteira. O brilho neon aparece de propósito em poucos dados por
+tela, para que eles saltem: o indicador "Precisam de você" em amarelo, a taxa
+resolvida sem humano em lima e o que está fora do prazo em vermelho.
+
+O cinza dos rótulos do dashboard (`#6B6B80`) fica abaixo do contraste mínimo de
+leitura, então o CRM usa um tom um pouco mais claro. A diferença é quase
+imperceptível e o texto fica legível.
+
+**A abelha do cabeçalho** voa em CSS enquanto o GIF oficial não chega. Para usar
+o GIF do dashboard, salve o arquivo como `public/assets/abelha.gif` e recarregue a
+página, sem mexer em código. Quem ativa a opção de reduzir movimento no sistema
+vê a abelha parada.
+
+## Filtro de período
+
+O seletor no canto superior direito filtra o CRM inteiro pela data de entrada:
+quando a mensagem chegou, quando a franquia entrou na esteira e quando o contato
+foi cadastrado. Tem atalhos para hoje, ontem, últimos 7 e 30 dias, este mês e o
+mês anterior, além de datas personalizadas. A escolha fica guardada no navegador.
+
+Filtrar uma fila de trabalho por data pode esconder coisa pendente. Por isso,
+quando existe mensagem aguardando resposta ou franquia em implantação fora do
+período escolhido, a tela avisa quantas são e oferece voltar para todo o
+período com um clique.
+
+O navegador converte o início e o fim do dia local para UTC antes de consultar,
+então "hoje" é o hoje de quem está usando. A API aceita os mesmos filtros nos
+parâmetros `desde` e `ate`, no formato `AAAA-MM-DD HH:MM:SS` em UTC.
 
 ## Antes de expor na internet
 

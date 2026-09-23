@@ -7,40 +7,56 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🐝</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap" />
 <link rel="stylesheet" href="/tokens.css" />
 <link rel="stylesheet" href="/components.css" />
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="sb">
-<nav class="sb-nav">
-  <span class="sb-brand"><span class="sb-brand__logo" aria-hidden="true">🐝</span>CRM 7Bee</span>
-  <div class="sb-nav__links" role="tablist">
-    <button class="sb-nav__link" role="tab" data-view="triagem" aria-current="page">Triagem</button>
-    <button class="sb-nav__link" role="tab" data-view="onboarding">Onboarding</button>
-    <button class="sb-nav__link" role="tab" data-view="contatos">Contatos</button>
-    <button class="sb-nav__link" role="tab" data-view="painel">Painel</button>
+<header class="sb-header">
+  <div class="sb-header__id">
+    <div class="sb-overline">
+      <span class="sb-bee" id="bee" aria-hidden="true">🐝</span>7Bee.ai · CRM operacional
+    </div>
+    <h1 class="sb-header__title">CRM 7Bee <span id="header-section">— Triagem</span></h1>
+    <div class="sb-clock" id="clock">&nbsp;</div>
+    <div class="sb-header__tag" id="header-tag">Fila do agente</div>
   </div>
-  <div class="sb-nav__end">
-    <button class="sb-btn sb-btn--ghost" id="theme-toggle" title="Alternar entre tema escuro e claro">
-      <span id="theme-label">Tema claro</span>
-    </button>
-    <button class="sb-btn sb-btn--ghost" id="refresh">Atualizar</button>
+
+  <div class="sb-header__side">
+    <div class="sb-header__tools">
+      <span class="sb-tools-label" id="period-caption">Período</span>
+      <div class="sb-period" id="period">
+        <button class="sb-period__btn" id="period-btn" type="button"
+          aria-haspopup="true" aria-expanded="false" aria-controls="period-menu" aria-describedby="period-caption">
+          <span id="period-label">Todo o período</span>
+          <span class="sb-period__range" id="period-range"></span>
+        </button>
+        <div class="sb-period__menu" id="period-menu" role="menu" aria-label="Escolher período" hidden></div>
+      </div>
+      <button class="sb-btn sb-btn--ghost" id="theme-toggle" type="button" title="Alternar entre tema escuro e claro">
+        <span id="theme-label">Tema claro</span>
+      </button>
+      <button class="sb-btn sb-btn--ghost" id="refresh" type="button">Atualizar</button>
+      <span class="sb-user" id="user-chip" title="As ações ficam registradas em nome de quem opera o CRM">guilherme</span>
+    </div>
+    <nav class="sb-nav__links" role="tablist" aria-label="Seções do CRM">
+      <button class="sb-nav__link" role="tab" data-view="triagem" aria-current="page">Triagem</button>
+      <button class="sb-nav__link" role="tab" data-view="onboarding">Onboarding</button>
+      <button class="sb-nav__link" role="tab" data-view="contatos">Contatos</button>
+      <button class="sb-nav__link" role="tab" data-view="painel">Painel</button>
+    </nav>
   </div>
-</nav>
+</header>
 
 <main>
   <!-- ------------------------------- TRIAGEM ------------------------------- -->
   <section id="view-triagem" class="view">
-    <header class="page-head">
-      <div>
-        <h1 class="title">Triagem de mensagens</h1>
-        <p class="subtitle">O agente responde o que sabe; aqui fica só o que precisa de você.</p>
-      </div>
-    </header>
-
+    <h2 class="sb-section sb-section--bar">Indicadores</h2>
     <div class="sb-stats" id="kpis"></div>
 
+    <h2 class="sb-section sb-section--honey">Fila de atendimento</h2>
+    <p class="subtitle">O agente responde o que sabe; aqui fica só o que precisa de você.</p>
     <div class="filter-block">
       <div class="sb-tabs" id="status-chips" role="tablist">
         <button class="sb-tab" role="tab" aria-selected="true" data-view="precisa">Precisam de você
@@ -54,14 +70,14 @@
         <button class="sb-tab" role="tab" aria-selected="false" data-view="todas">Todas</button>
       </div>
       <div class="sb-toolbar">
-        <input type="search" id="msg-search" class="sb-field sb-field--grow" placeholder="Buscar texto ou remetente…" />
-        <select id="msg-priority" class="sb-field">
+        <input type="search" id="msg-search" class="sb-field sb-field--grow" placeholder="Buscar texto ou remetente…" aria-label="Buscar mensagens" />
+        <select id="msg-priority" class="sb-field" aria-label="Prioridade">
           <option value="">Toda prioridade</option>
           <option value="alta">Alta</option>
           <option value="media">Média</option>
           <option value="baixa">Baixa</option>
         </select>
-        <select id="msg-channel" class="sb-field">
+        <select id="msg-channel" class="sb-field" aria-label="Canal">
           <option value="">Todo canal</option>
           <option value="whatsapp">WhatsApp</option>
           <option value="email">E-mail</option>
@@ -71,7 +87,7 @@
           <option value="chat">Chat</option>
           <option value="outro">Outro</option>
         </select>
-        <select id="msg-sort" class="sb-field">
+        <select id="msg-sort" class="sb-field" aria-label="Ordenação">
           <option value="score">Ordenar por relevância</option>
           <option value="recente">Ordenar por mais recente</option>
         </select>
@@ -79,24 +95,23 @@
       </div>
     </div>
 
+    <div id="msg-notice" hidden></div>
     <div id="msg-list" class="cards"></div>
   </section>
 
   <!-- ----------------------------- ONBOARDING ----------------------------- -->
   <section id="view-onboarding" class="view" hidden>
-    <header class="page-head">
-      <div>
-        <h1 class="title">Onboarding de franquias</h1>
-        <p class="subtitle">Esteira de implantação. Arraste o card ou use o botão para avançar de etapa.</p>
-      </div>
+    <div class="page-head">
+      <h2 class="sb-section sb-section--bar">Indicadores da implantação</h2>
       <button class="sb-btn sb-btn--primary" id="new-onboarding">Nova franquia</button>
-    </header>
-
+    </div>
     <div class="sb-stats" id="onb-kpis"></div>
 
+    <h2 class="sb-section">Esteira</h2>
+    <p class="subtitle">Arraste o card ou use o botão para avançar de etapa.</p>
     <div class="sb-toolbar">
-      <input type="search" id="onb-search" class="sb-field sb-field--grow" placeholder="Buscar franquia, responsável ou grupo…" />
-      <select id="onb-situacao" class="sb-field">
+      <input type="search" id="onb-search" class="sb-field sb-field--grow" placeholder="Buscar franquia, responsável ou grupo…" aria-label="Buscar franquias" />
+      <select id="onb-situacao" class="sb-field" aria-label="Situação">
         <option value="ativo">Em andamento</option>
         <option value="pausado">Pausadas</option>
         <option value="cancelado">Canceladas</option>
@@ -104,22 +119,21 @@
       </select>
     </div>
 
+    <div id="onb-notice" hidden></div>
     <div class="board" id="onb-board"></div>
   </section>
 
   <!-- ------------------------------ CONTATOS ------------------------------ -->
   <section id="view-contatos" class="view" hidden>
-    <header class="page-head">
-      <div>
-        <h1 class="title">Contatos</h1>
-        <p class="subtitle">Quem é quem, em que etapa está e quem responde por ele.</p>
-      </div>
+    <div class="page-head">
+      <h2 class="sb-section sb-section--bar">Base de contatos</h2>
       <button class="sb-btn sb-btn--primary" id="new-contact">Novo contato</button>
-    </header>
+    </div>
+    <p class="subtitle">Quem é quem, em que etapa está e quem responde por ele.</p>
 
     <div class="sb-toolbar">
-      <input type="search" id="contact-search" class="sb-field sb-field--grow" placeholder="Buscar contato, empresa, e-mail…" />
-      <select id="contact-stage" class="sb-field">
+      <input type="search" id="contact-search" class="sb-field sb-field--grow" placeholder="Buscar contato, empresa, e-mail ou tag…" aria-label="Buscar contatos" />
+      <select id="contact-stage" class="sb-field" aria-label="Etapa">
         <option value="">Toda etapa</option>
         <option value="lead">Lead</option>
         <option value="qualificado">Qualificado</option>
@@ -141,14 +155,22 @@
 
   <!-- ------------------------------- PAINEL ------------------------------- -->
   <section id="view-painel" class="view" hidden>
-    <header class="page-head">
-      <div>
-        <h1 class="title">Painel</h1>
-        <p class="subtitle">Quanto o agente resolve sozinho e onde o time precisa entrar.</p>
-      </div>
-    </header>
-
+    <h2 class="sb-section sb-section--bar">Indicadores</h2>
     <div class="sb-stats" id="kpis-panel"></div>
+
+    <h2 class="sb-section">Agente de IA</h2>
+    <div class="panel-grid">
+      <div class="card">
+        <h3>O que o agente fez com as mensagens</h3>
+        <div id="chart-agent" class="bars"></div>
+      </div>
+      <div class="card">
+        <h3>Como o time avaliou o agente</h3>
+        <div id="chart-feedback" class="bars"></div>
+      </div>
+    </div>
+
+    <h2 class="sb-section sb-section--amber">Canais e funil</h2>
     <div class="panel-grid">
       <div class="card">
         <h3>Mensagens abertas por canal</h3>
@@ -157,14 +179,6 @@
       <div class="card">
         <h3>Contatos por etapa</h3>
         <div id="chart-stage" class="bars"></div>
-      </div>
-      <div class="card">
-        <h3>O que o agente fez com as mensagens</h3>
-        <div id="chart-agent" class="bars"></div>
-      </div>
-      <div class="card">
-        <h3>Como o time avaliou o agente</h3>
-        <div id="chart-feedback" class="bars"></div>
       </div>
     </div>
   </section>

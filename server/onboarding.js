@@ -1,4 +1,5 @@
 import { db, log } from './db.js';
+import { lerPeriodo, filtroPeriodo, foraDoPeriodo } from './periodo.js';
 
 /**
  * Esteira de onboarding de franquias.
@@ -95,9 +96,10 @@ function decorate(row) {
   };
 }
 
-export function listOnboardings({ q = '', stage = '', situacao = 'ativo' } = {}) {
-  let sql = `SELECT * FROM onboardings WHERE 1=1`;
-  const args = [];
+export function listOnboardings({ q = '', stage = '', situacao = 'ativo', desde = '', ate = '' } = {}) {
+  const periodo = filtroPeriodo('started_at', lerPeriodo({ desde, ate }));
+  let sql = `SELECT * FROM onboardings WHERE 1=1${periodo.sql}`;
+  const args = [...periodo.args];
   if (situacao && situacao !== 'todas') { sql += ` AND situacao = ?`; args.push(situacao); }
   if (stage) { sql += ` AND stage = ?`; args.push(stage); }
   if (q) {
@@ -358,20 +360,30 @@ export function onboardingDoContato(contactId) {
 
 /* -------------------------------- indicadores ------------------------------- */
 
-export function onboardingStats() {
+export function onboardingStats({ desde = '', ate = '' } = {}) {
+  const p = lerPeriodo({ desde, ate });
+  const f = filtroPeriodo('started_at', p);
   const porEtapa = Object.fromEntries(
     db.prepare(
-      `SELECT stage, COUNT(*) n FROM onboardings WHERE situacao = 'ativo' GROUP BY stage`
-    ).all().map((r) => [r.stage, r.n])
+      `SELECT stage, COUNT(*) n FROM onboardings WHERE situacao = 'ativo'${f.sql} GROUP BY stage`
+    ).all(...f.args).map((r) => [r.stage, r.n])
   );
-  const ativos = listOnboardings({ situacao: 'ativo' });
+  const ativos = listOnboardings({ situacao: 'ativo', desde, ate });
   const concluidos = db.prepare(
-    `SELECT COUNT(*) n FROM onboardings WHERE stage = 'concluido'`
-  ).get().n;
+    `SELECT COUNT(*) n FROM onboardings WHERE stage = 'concluido'${f.sql}`
+  ).get(...f.args).n;
   const tempoMedio = db.prepare(
     `SELECT AVG(julianday(concluded_at) - julianday(started_at)) v
-     FROM onboardings WHERE concluded_at IS NOT NULL`
-  ).get().v;
+     FROM onboardings WHERE concluded_at IS NOT NULL${f.sql}`
+  ).get(...f.args).v;
+
+  // Franquias ainda em implantação que começaram fora do período escolhido.
+  const fora = foraDoPeriodo('started_at', p);
+  const emAndamentoFora = p.ativo
+    ? db.prepare(
+      `SELECT COUNT(*) n FROM onboardings WHERE situacao = 'ativo' AND stage <> 'concluido'${fora.sql}`
+    ).get(...fora.args).n
+    : 0;
 
   return {
     etapas: STAGES.map((s) => ({ ...s, n: porEtapa[s.key] ?? 0 })),
@@ -380,7 +392,8 @@ export function onboardingStats() {
     bloqueadas: ativos.filter((o) => o.bloqueada).length,
     concluidos,
     dias_medios_para_concluir: tempoMedio ? Math.round(tempoMedio * 10) / 10 : 0,
-    alerta_dias: PARADO_DIAS
+    alerta_dias: PARADO_DIAS,
+    em_andamento_fora_do_periodo: emAndamentoFora
   };
 }
 

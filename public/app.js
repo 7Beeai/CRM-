@@ -65,6 +65,10 @@ const ICON = {
   arrow: traco('<path d="M5 12h14M13 6l6 6-6 6"/>'),
   eye: traco('<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>'),
   chat: traco('<path d="M20 15a3 3 0 0 1-3 3H8l-4 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3z"/>'),
+  calendar: traco('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  chevron: traco('<path d="M6 9l6 6 6-6"/>'),
+  user: traco('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  grid: traco('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
   group: traco('<circle cx="9" cy="9" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 7a3 3 0 0 1 0 6M18 20a6 6 0 0 0-2-4.5"/>')
 };
 
@@ -117,6 +121,67 @@ function openModal({ title, fields, confirmLabel = 'Salvar' }) {
       resolve(out);
     });
   });
+}
+
+/* --------------------------------- período -------------------------------- */
+
+// O navegador calcula o início e o fim do dia local e manda em UTC, no mesmo
+// formato que o banco guarda. Assim "hoje" é o hoje de quem está usando.
+const utc = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+const inicioDoDia = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+const fimDoDia = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+const somaDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const ddmm = (d) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+const PERIODOS = {
+  tudo: { rotulo: 'Todo o período', faixa: () => null },
+  hoje: { rotulo: 'Hoje', faixa: (h) => [inicioDoDia(h), fimDoDia(h)] },
+  ontem: { rotulo: 'Ontem', faixa: (h) => [inicioDoDia(somaDias(h, -1)), fimDoDia(somaDias(h, -1))] },
+  '7d': { rotulo: 'Últimos 7 dias', faixa: (h) => [inicioDoDia(somaDias(h, -6)), fimDoDia(h)] },
+  mes: { rotulo: 'Este mês', faixa: (h) => [new Date(h.getFullYear(), h.getMonth(), 1), fimDoDia(h)] },
+  mes_anterior: {
+    rotulo: 'Mês anterior',
+    faixa: (h) => [new Date(h.getFullYear(), h.getMonth() - 1, 1), fimDoDia(new Date(h.getFullYear(), h.getMonth(), 0))]
+  },
+  '30d': { rotulo: 'Últimos 30 dias', faixa: (h) => [inicioDoDia(somaDias(h, -29)), fimDoDia(h)] }
+};
+
+const periodo = { chave: 'tudo', inicio: null, fim: null };
+
+function faixaAtual() {
+  if (periodo.chave === 'custom') {
+    return periodo.inicio && periodo.fim ? [periodo.inicio, periodo.fim] : null;
+  }
+  return PERIODOS[periodo.chave]?.faixa(new Date()) ?? null;
+}
+
+/** Acrescenta o período escolhido aos parâmetros de qualquer consulta. */
+function comPeriodo(params = new URLSearchParams()) {
+  const faixa = faixaAtual();
+  if (faixa) {
+    params.set('desde', utc(faixa[0]));
+    params.set('ate', utc(faixa[1]));
+  }
+  return params;
+}
+
+function rotuloDoPeriodo() {
+  const faixa = faixaAtual();
+  const rotulo = periodo.chave === 'custom' ? 'Personalizado' : PERIODOS[periodo.chave].rotulo;
+  if (!faixa) return { rotulo, faixa: '' };
+  const [a, b] = faixa;
+  return { rotulo, faixa: ddmm(a) === ddmm(b) ? ddmm(a) : `${ddmm(a)}–${ddmm(b)}` };
+}
+
+function avisoForaDoPeriodo(alvo, quantidade, texto) {
+  const caixa = $(alvo);
+  if (!quantidade) { caixa.hidden = true; caixa.innerHTML = ''; return; }
+  caixa.hidden = false;
+  caixa.innerHTML = `
+    <div class="sb-notice" role="status">
+      <span><b>${quantidade}</b> ${texto}</span>
+      <button class="sb-btn sb-btn--sm" type="button" data-periodo-tudo>Ver todo o período</button>
+    </div>`;
 }
 
 /* --------------------------------- triagem -------------------------------- */
@@ -261,44 +326,63 @@ function messageCard(m) {
 }
 
 async function renderMessages() {
-  const params = new URLSearchParams(
+  const params = comPeriodo(new URLSearchParams(
     Object.entries({ ...state.msgFilters, ...FILAS[state.fila] }).filter(([, v]) => v)
-  );
+  ));
   const list = await apiCall(`/messages?${params}`);
   $('#msg-list').innerHTML = list.length
     ? list.map(messageCard).join('')
     : '<div class="empty">Nenhuma mensagem com esses filtros.</div>';
 }
 
-function statCard({ label, value, delta = null, attention = false }) {
+// tom: 'accent' (lima, o destaque positivo), 'attention' (amarelo, precisa de
+// gente) ou 'danger' (vermelho). Sem tom, o card fica neutro.
+function statCard({ label, value, delta = null, tom = '', barra = null }) {
   return `
-    <div class="sb-stat ${attention ? 'sb-stat--attention' : ''}">
-      <span class="sb-stat__value">${esc(value)}</span>
+    <div class="sb-stat ${tom ? `sb-stat--${tom}` : ''}">
       <span class="sb-stat__label">${esc(label)}</span>
+      <span class="sb-stat__value">${esc(value)}</span>
       ${delta ? `<span class="sb-stat__delta ${delta.tom}">${esc(delta.texto)}</span>` : ''}
+      ${barra === null ? '' : `<span class="sb-stat__bar" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, barra))}%"></i></span>`}
     </div>`;
 }
 
 async function renderKpis() {
-  const d = await apiCall('/dashboard');
+  const d = await apiCall(`/dashboard?${comPeriodo()}`);
   const horas = `${num(d.tempo_medio_resposta_horas)}h`;
   const cards = [
-    { label: 'Precisam de você', value: d.escaladas, attention: d.escaladas > 0 },
+    {
+      label: 'Precisam de você',
+      value: d.escaladas,
+      tom: d.escaladas > 0 ? 'attention' : '',
+      delta: d.escaladas > 0 ? { tom: '', texto: `${d.alta_prioridade} com prioridade alta` } : { tom: 'is-up', texto: 'Fila vazia' }
+    },
     {
       label: 'Fora do prazo',
       value: d.atrasadas,
-      delta: d.atrasadas === 0 ? { tom: 'is-up', texto: 'Tudo em dia' } : null
+      tom: d.atrasadas > 0 ? 'danger' : '',
+      delta: d.atrasadas === 0 ? { tom: 'is-up', texto: 'Tudo em dia' } : { tom: 'is-down', texto: 'Responder primeiro' }
     },
     { label: 'Aguardando o agente', value: d.aguardando_agente },
     { label: 'Respondidas pelo agente', value: d.auto_respondidas },
-    { label: 'Resolvidas sem humano', value: `${d.taxa_automacao}%` },
+    {
+      label: 'Resolvidas sem humano',
+      value: `${d.taxa_automacao}%`,
+      tom: 'accent',
+      barra: d.taxa_automacao
+    },
     { label: 'Tempo médio de resposta', value: horas }
   ];
   $('#kpis').innerHTML = cards.map(statCard).join('');
 
   $('#kpis-panel').innerHTML = cards.map(statCard).join('') +
-    statCard({ label: 'Contatos', value: d.contatos }) +
-    statCard({ label: 'Clientes ativos', value: d.clientes });
+    statCard({ label: 'Contatos', value: num(d.contatos) }) +
+    statCard({ label: 'Clientes ativos', value: num(d.clientes) });
+
+  avisoForaDoPeriodo('#msg-notice', d.pendentes_fora_do_periodo,
+    d.pendentes_fora_do_periodo === 1
+      ? 'mensagem pendente chegou fora deste período e não aparece na fila.'
+      : 'mensagens pendentes chegaram fora deste período e não aparecem na fila.');
 
   // Contadores das abas de filtro.
   const contagens = { precisa: d.escaladas, aguardando: d.aguardando_agente, auto: d.auto_respondidas };
@@ -390,7 +474,7 @@ const STAGES = [
 ];
 
 async function renderContacts() {
-  const params = new URLSearchParams(Object.entries(state.contactFilters).filter(([, v]) => v));
+  const params = comPeriodo(new URLSearchParams(Object.entries(state.contactFilters).filter(([, v]) => v)));
   const rows = await apiCall(`/contacts?${params}`);
   const tbody = $('#contact-table tbody');
   tbody.innerHTML = rows.length ? rows.map((c) => `
@@ -447,6 +531,12 @@ function onbCard(o) {
     <div class="onb__top">
       <span class="sb-avatar" style="width:28px;height:28px;font-size:11px">${esc(iniciaisDe(o.franchise_name))}</span>
       <span class="onb__name">${esc(o.franchise_name)}</span>
+      ${o.whatsapp_link
+        ? `<a class="sb-btn sb-btn--sm onb__whats" href="${esc(o.whatsapp_link)}" target="_blank" rel="noopener noreferrer"
+             title="${o.whatsapp_destino === 'grupo' ? 'Abrir o grupo da franquia' : 'Abrir a conversa com o contato'}"
+             aria-label="${o.whatsapp_destino === 'grupo' ? 'Abrir o grupo da franquia no WhatsApp' : 'Abrir a conversa no WhatsApp'}">
+             ${o.whatsapp_destino === 'grupo' ? ICON.group : ICON.chat}</a>`
+        : ''}
     </div>
     <div class="onb__meta">
       ${esc(o.plan || 'sem plano informado')} · há ${o.dias_desde_o_inicio}d${o.owner ? ` · ${esc(o.owner)}` : ''}
@@ -457,11 +547,6 @@ function onbCard(o) {
     </div>
     <div class="onb__actions">
       <button class="sb-btn sb-btn--sm" data-onb="abrir" data-id="${o.id}">${ICON.eye}Abrir</button>
-      ${o.whatsapp_link
-        ? `<a class="sb-btn sb-btn--sm" href="${esc(o.whatsapp_link)}" target="_blank" rel="noopener noreferrer"
-             title="${o.whatsapp_destino === 'grupo' ? 'Abrir o grupo da franquia' : 'Abrir a conversa com o contato'}">
-             ${o.whatsapp_destino === 'grupo' ? ICON.group : ICON.chat}</a>`
-        : ''}
       ${proxima
         ? `<button class="sb-btn sb-btn--sm ${proxima.key === 'concluido' ? 'sb-btn--primary' : ''}"
              data-onb="avancar" data-id="${o.id}" data-stage="${proxima.key}">
@@ -474,19 +559,29 @@ function onbCard(o) {
 
 async function renderOnboarding() {
   await carregarEtapas();
-  const params = new URLSearchParams(Object.entries(onb.filtros).filter(([, v]) => v));
+  const params = comPeriodo(new URLSearchParams(Object.entries(onb.filtros).filter(([, v]) => v)));
   const [lista, stats] = await Promise.all([
     apiCall(`/onboarding?${params}`),
-    apiCall('/onboarding/stats')
+    apiCall(`/onboarding/stats?${comPeriodo()}`)
   ]);
 
+  const totalAtivo = stats.em_andamento + stats.concluidos;
   $('#onb-kpis').innerHTML = [
-    { label: 'Em implantação', value: stats.em_andamento },
-    { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, attention: stats.paradas > 0 },
-    { label: 'Com tarefa travada', value: stats.bloqueadas, attention: stats.bloqueadas > 0 },
-    { label: 'Concluídas', value: stats.concluidos },
+    { label: 'Em implantação', value: stats.em_andamento, tom: 'accent' },
+    { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, tom: stats.paradas > 0 ? 'attention' : '' },
+    { label: 'Com tarefa travada', value: stats.bloqueadas, tom: stats.bloqueadas > 0 ? 'danger' : '' },
+    {
+      label: 'Concluídas',
+      value: stats.concluidos,
+      barra: totalAtivo ? Math.round((stats.concluidos / totalAtivo) * 100) : 0
+    },
     { label: 'Dias até concluir', value: num(stats.dias_medios_para_concluir) }
   ].map(statCard).join('');
+
+  avisoForaDoPeriodo('#onb-notice', stats.em_andamento_fora_do_periodo,
+    stats.em_andamento_fora_do_periodo === 1
+      ? 'franquia em implantação começou fora deste período e não aparece na esteira.'
+      : 'franquias em implantação começaram fora deste período e não aparecem na esteira.');
 
   $('#onb-board').innerHTML = onb.stages.map((stage) => {
     const cards = lista.filter((o) => o.stage === stage.key);
@@ -673,8 +768,18 @@ $('#onb-board').addEventListener('drop', async (e) => {
 
 /* ---------------------------------- setup --------------------------------- */
 
+const SECOES = {
+  triagem: { titulo: 'Triagem', tag: 'Fila do agente' },
+  onboarding: { titulo: 'Onboarding', tag: 'Esteira de implantação' },
+  contatos: { titulo: 'Contatos', tag: 'Base de clientes' },
+  painel: { titulo: 'Painel', tag: 'Visão macro' }
+};
+
 function switchView(view) {
   state.view = view;
+  $('#header-section').textContent = `— ${SECOES[view].titulo}`;
+  $('#header-tag').innerHTML = `${ICON.grid}${esc(SECOES[view].tag)}`;
+  document.title = `${SECOES[view].titulo} · CRM 7Bee`;
   $$('.sb-nav__link').forEach((t) => {
     if (t.dataset.view === view) t.setAttribute('aria-current', 'page');
     else t.removeAttribute('aria-current');
@@ -799,11 +904,151 @@ for (const [sel, icone] of [
   ['#refresh', ICON.undo],
   ['#new-message', ICON.plus],
   ['#new-contact', ICON.plus],
-  ['#new-onboarding', ICON.plus]
+  ['#new-onboarding', ICON.plus],
+  ['#user-chip', ICON.user],
+  ['#period-btn', ICON.calendar]
 ]) {
   const botao = $(sel);
   if (botao) botao.insertAdjacentHTML('afterbegin', icone);
 }
+$('#period-btn').insertAdjacentHTML('beforeend', ICON.chevron);
+$('#header-tag').insertAdjacentHTML('afterbegin', ICON.grid);
+
+// Relógio ao vivo, como no dashboard: 14:05:43 • quarta-feira, 23 de setembro de 2026.
+function tique() {
+  const agora = new Date();
+  const hora = agora.toLocaleTimeString('pt-BR', { hour12: false });
+  const dia = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  $('#clock').textContent = `${hora} • ${dia}`;
+}
+tique();
+setInterval(tique, 1000);
+
+// Abelha: se o GIF oficial estiver em public/assets/abelha.gif, ele entra no lugar do emoji.
+apiCall('/marca').then(({ abelha_gif: gif }) => {
+  if (!gif) return;
+  const img = new Image();
+  img.alt = '';
+  img.onload = () => {
+    const bee = $('#bee');
+    bee.textContent = '';
+    bee.classList.add('is-gif');
+    bee.append(img);
+  };
+  img.src = gif;
+}).catch(() => { /* sem GIF, fica a abelha animada em CSS */ });
+
+// Seletor de período.
+function desenharMenuDoPeriodo() {
+  const agora = new Date();
+  const opcoes = Object.entries(PERIODOS).map(([chave, p]) => {
+    const faixa = p.faixa(agora);
+    const dica = faixa ? (ddmm(faixa[0]) === ddmm(faixa[1]) ? ddmm(faixa[0]) : `${ddmm(faixa[0])}–${ddmm(faixa[1])}`) : 'sem filtro';
+    return `<button type="button" class="sb-period__opt" role="menuitemradio" data-periodo="${chave}"
+      aria-checked="${periodo.chave === chave}">${esc(p.rotulo)}<small>${esc(dica)}</small></button>`;
+  }).join('');
+  const dataLocal = (d) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '');
+  const hoje = dataLocal(agora);
+  $('#period-menu').innerHTML = `${opcoes}
+    <div class="sb-period__custom">
+      <div class="sb-period__row">
+        <label>De<input type="date" id="period-de" max="${hoje}" value="${dataLocal(periodo.inicio)}" /></label>
+        <label>Até<input type="date" id="period-ate" max="${hoje}" value="${dataLocal(periodo.fim)}" /></label>
+      </div>
+      <button type="button" class="sb-btn sb-btn--sm sb-btn--primary" id="period-aplicar">Aplicar datas</button>
+    </div>`;
+}
+
+function atualizarBotaoDoPeriodo() {
+  const { rotulo, faixa } = rotuloDoPeriodo();
+  $('#period-label').textContent = faixa ? `${rotulo} ·` : rotulo;
+  $('#period-range').textContent = faixa;
+  $('#period-btn').classList.toggle('is-active', periodo.chave !== 'tudo');
+}
+
+function guardarPeriodo() {
+  try {
+    localStorage.setItem('crm7bee-periodo', JSON.stringify({
+      chave: periodo.chave,
+      inicio: periodo.inicio?.toISOString() ?? null,
+      fim: periodo.fim?.toISOString() ?? null
+    }));
+  } catch { /* navegador sem storage */ }
+}
+
+function escolherPeriodo(chave, inicio = null, fim = null) {
+  periodo.chave = chave;
+  periodo.inicio = inicio;
+  periodo.fim = fim;
+  guardarPeriodo();
+  atualizarBotaoDoPeriodo();
+  fecharMenuDoPeriodo();
+  refresh();
+}
+
+function abrirMenuDoPeriodo() {
+  desenharMenuDoPeriodo();
+  $('#period-menu').hidden = false;
+  $('#period-btn').setAttribute('aria-expanded', 'true');
+  ($('#period-menu [aria-checked="true"]') ?? $('#period-menu .sb-period__opt'))?.focus();
+}
+
+function fecharMenuDoPeriodo({ devolverFoco = false } = {}) {
+  if ($('#period-menu').hidden) return;
+  $('#period-menu').hidden = true;
+  $('#period-btn').setAttribute('aria-expanded', 'false');
+  if (devolverFoco) $('#period-btn').focus();
+}
+
+$('#period-btn').addEventListener('click', () => {
+  if ($('#period-menu').hidden) abrirMenuDoPeriodo();
+  else fecharMenuDoPeriodo();
+});
+
+$('#period-menu').addEventListener('click', (e) => {
+  const opcao = e.target.closest('[data-periodo]');
+  if (opcao) return escolherPeriodo(opcao.dataset.periodo);
+  if (e.target.closest('#period-aplicar')) {
+    const de = $('#period-de').value;
+    const ate = $('#period-ate').value;
+    if (!de || !ate) return toast('Escolha as duas datas para aplicar.');
+    const [ad, am, add] = de.split('-').map(Number);
+    const [bd, bm, bdd] = ate.split('-').map(Number);
+    const inicio = new Date(ad, am - 1, add, 0, 0, 0);
+    const fim = new Date(bd, bm - 1, bdd, 23, 59, 59);
+    if (inicio > fim) return toast('A data inicial precisa vir antes da final.');
+    escolherPeriodo('custom', inicio, fim);
+  }
+});
+
+$('#period-menu').addEventListener('keydown', (e) => {
+  const opcoes = $$('#period-menu .sb-period__opt');
+  const i = opcoes.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' && i >= 0) { e.preventDefault(); opcoes[(i + 1) % opcoes.length].focus(); }
+  if (e.key === 'ArrowUp' && i >= 0) { e.preventDefault(); opcoes[(i - 1 + opcoes.length) % opcoes.length].focus(); }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') fecharMenuDoPeriodo({ devolverFoco: true });
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#period')) fecharMenuDoPeriodo();
+});
+
+// "Ver todo o período" nos avisos de itens escondidos.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-periodo-tudo]')) escolherPeriodo('tudo');
+});
+
+try {
+  const salvo = JSON.parse(localStorage.getItem('crm7bee-periodo') ?? 'null');
+  if (salvo && (PERIODOS[salvo.chave] || salvo.chave === 'custom')) {
+    periodo.chave = salvo.chave;
+    periodo.inicio = salvo.inicio ? new Date(salvo.inicio) : null;
+    periodo.fim = salvo.fim ? new Date(salvo.fim) : null;
+  }
+} catch { /* navegador sem storage */ }
+atualizarBotaoDoPeriodo();
 
 refresh();
 setInterval(() => { if (!$('#modal').open) refresh(); }, 60000);

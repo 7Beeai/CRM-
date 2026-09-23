@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
 import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as api from './api.js';
@@ -11,6 +11,9 @@ const PORT = Number(process.env.PORT ?? 3000);
 const TOKEN = process.env.CRM_TOKEN ?? '';
 
 const MIME = {
+  '.gif': 'image/gif',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -81,8 +84,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/health') return send(res, 200, { ok: true });
+    if (pathname === '/api/marca' && req.method === 'GET') {
+      const gif = await access(join(publicDir, 'assets', 'abelha.gif')).then(() => true, () => false);
+      return send(res, 200, { abelha_gif: gif ? '/assets/abelha.gif' : null });
+    }
     if (pathname === '/api/onboarding/meta' && req.method === 'GET') return send(res, 200, onb.onboardingMeta);
-    if (pathname === '/api/onboarding/stats' && req.method === 'GET') return send(res, 200, onb.onboardingStats());
+    if (pathname === '/api/onboarding/stats' && req.method === 'GET') return send(res, 200, onb.onboardingStats(q));
 
     if (pathname === '/api/onboarding') {
       if (req.method === 'GET') return send(res, 200, onb.listOnboardings(q));
@@ -114,7 +121,7 @@ const server = createServer(async (req, res) => {
       }
     }
     if (pathname === '/api/meta' && req.method === 'GET') return send(res, 200, api.meta);
-    if (pathname === '/api/dashboard' && req.method === 'GET') return send(res, 200, api.dashboard());
+    if (pathname === '/api/dashboard' && req.method === 'GET') return send(res, 200, api.dashboard(q));
 
     if (pathname === '/api/messages') {
       if (req.method === 'GET') return send(res, 200, api.listMessages(q));
