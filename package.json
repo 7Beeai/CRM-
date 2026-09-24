@@ -11,7 +11,8 @@
     "start": "node --no-warnings server/index.js",
     "dev": "node --no-warnings --watch server/index.js",
     "seed": "node --no-warnings server/seed.js",
-    "start:simulado": "CRM_WHATSAPP_SIMULADO=1 node --no-warnings server/index.js"
+    "start:simulado": "CRM_WHATSAPP_SIMULADO=1 node --no-warnings server/index.js",
+    "importar:whatsapp": "node --no-warnings server/importar-grupos.js"
   },
   "optionalDependencies": {
     "@whiskeysockets/baileys": "6.7.24",

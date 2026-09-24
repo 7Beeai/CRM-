@@ -24,6 +24,8 @@ const SIMULADO = process.env.CRM_WHATSAPP_SIMULADO === '1';
 // de família ou de outros assuntos virem franquia, ex.: CRM_WHATSAPP_FILTRO="7bee|onboarding".
 const AUTO_ENTRADA = process.env.CRM_WHATSAPP_AUTO !== '0';
 const FILTRO = process.env.CRM_WHATSAPP_FILTRO ? new RegExp(process.env.CRM_WHATSAPP_FILTRO, 'i') : null;
+// Grupos que casam com o filtro mas não são franquia, ex.: CRM_WHATSAPP_IGNORAR="gest[aã]o".
+const IGNORAR = process.env.CRM_WHATSAPP_IGNORAR ? new RegExp(process.env.CRM_WHATSAPP_IGNORAR, 'i') : null;
 
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
 
@@ -112,7 +114,7 @@ async function entradaAutomatica(meta) {
  */
 export function levarGrupoNovo(grupo, origem = 'WhatsApp') {
   if (!AUTO_ENTRADA) return null;
-  if (FILTRO && !FILTRO.test(grupo.nome)) return null;
+  if (!passaNoFiltro(grupo.nome)) return null;
   if (jaNaEsteira().has(grupo.id)) return null;
   try {
     const franquia = fromWhatsappGroup({
@@ -128,7 +130,12 @@ export function levarGrupoNovo(grupo, origem = 'WhatsApp') {
   }
 }
 
-export const configEntrada = { automatica: AUTO_ENTRADA, filtro: FILTRO ? FILTRO.source : null };
+/** O nome do grupo passa no filtro de franquias e não está na lista de ignorados. */
+export function passaNoFiltro(nome) {
+  return (!FILTRO || FILTRO.test(nome)) && !(IGNORAR && IGNORAR.test(nome));
+}
+
+export const configEntrada = { automatica: AUTO_ENTRADA, filtro: FILTRO ? FILTRO.source : null, ignorar: IGNORAR ? IGNORAR.source : null };
 
 /* -------------------------------- conexão --------------------------------- */
 

@@ -34,6 +34,7 @@ Variáveis de ambiente:
 | `CRM_ONBOARDING_PRAZO_UTEIS` | `1` conta a meta em dias úteis | dias corridos |
 | `EVOLUTION_URL`, `EVOLUTION_INSTANCE`, `EVOLUTION_API_KEY` | lê o WhatsApp do CS pela Evolution API, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) | vazio (usa QR code) |
 | `CRM_WHATSAPP_FILTRO` | só grupos com esse nome entram sozinhos na esteira, ex.: `CDT` | vazio (todos) |
+| `CRM_WHATSAPP_IGNORAR` | grupos que nunca viram franquia, ex.: `gest[aã]o` | vazio |
 
 ## As abas
 
@@ -176,6 +177,7 @@ server/seed.js        dados de exemplo
 server/periodo.js     filtro de período compartilhado
 server/whatsapp.js    conexão com o WhatsApp por QR code e importação de grupos
 server/evolution.js   leitura dos grupos pela Evolution API (sem QR code)
+server/importar-grupos.js  importação de uma vez dos grupos de franquia (npm run importar:whatsapp)
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
 public/styles.css     camada da aplicação, só com tokens

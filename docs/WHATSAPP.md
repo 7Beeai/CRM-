@@ -30,6 +30,7 @@ EVOLUTION_URL="https://evolution.7bee.top" \
 EVOLUTION_INSTANCE="Guilherme-7Bee" \
 EVOLUTION_API_KEY="…" \
 CRM_WHATSAPP_FILTRO="CDT" \
+CRM_WHATSAPP_IGNORAR="gest[aã]o" \
 npm start
 ```
 
@@ -45,6 +46,25 @@ Ao subir, o CRM já confere a instância e lê os grupos. No log aparece
 `Evolution: instância Guilherme-7Bee lida, N grupos.`
 
 ### Importar as franquias que já existem
+
+**De uma vez, pelo terminal.** Com as mesmas variáveis definidas, na pasta do CRM:
+
+```bash
+npm run importar:whatsapp               # mostra o que vai entrar, sem gravar
+npm run importar:whatsapp -- --confirmar  # grava na esteira, em Nova franquia
+```
+
+O comando traz todo grupo que passa em `CRM_WHATSAPP_FILTRO` e não casa com
+`CRM_WHATSAPP_IGNORAR`. Com os valores acima, entram os 32 grupos CDT e fica
+de fora o `CDT.IA - Gestão`, que é interno. `--etapa=ctn` (ou outra etapa)
+coloca todos numa mesma etapa. Rodar de novo não duplica.
+
+A data de início de cada franquia é a data de criação do grupo. Franquias
+antigas entram, portanto, com a meta de 5 dias estourada. Mova cada uma para a
+etapa real ou para Concluído logo depois de importar, para o indicador do
+bônus contar só as novas.
+
+**Escolhendo grupo a grupo, pela tela.**
 
 1. Na aba **Onboarding**, clique em **WhatsApp conectado**.
 2. Digite `CDT` na busca e clique em **Marcar os N da lista**.
@@ -201,6 +221,7 @@ do celular.
 | `EVOLUTION_API_KEY` | chave da Evolution, só no servidor | vazio |
 | `CRM_EVOLUTION_INTERVALO_MIN` | minutos entre conferências de grupos novos (`0` desliga) | `5` |
 | `CRM_WHATSAPP_FILTRO` | só grupos com nome que combina entram sozinhos (expressão regular, sem diferenciar maiúsculas) | vazio (todos) |
+| `CRM_WHATSAPP_IGNORAR` | grupos que casam com o filtro mas não são franquia, ex.: `gest[aã]o` | vazio |
 | `CRM_WHATSAPP_AUTO` | `0` desliga a entrada automática de grupos novos | ligada |
 | `CRM_WHATSAPP_SESSAO` | pasta da sessão | `data/whatsapp-sessao` |
 | `CRM_WHATSAPP_SIMULADO` | `1` liga o modo de teste sem celular | desligado |
