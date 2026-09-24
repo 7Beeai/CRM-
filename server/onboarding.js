@@ -63,6 +63,8 @@ function situacaoDoPrazo(row) {
     vence_em: new Date(vence).toISOString(),
     dias_decorridos: Math.round(decorridos * 10) / 10
   };
+  // Concluída antes de existir o CRM: não dá para medir a agilidade, então não conta na meta.
+  if (row.fora_da_meta) return { ...base, situacao: 'anterior', dentro: null };
   if (row.concluded_at) {
     const dentro = parse(row.concluded_at) <= vence;
     return { ...base, situacao: dentro ? 'no_prazo' : 'fora_do_prazo', dentro };
@@ -335,6 +337,14 @@ export function moveStage(id, stage, { actor = 'sistema' } = {}) {
   return getOnboarding(id);
 }
 
+/** Marca uma franquia importada já concluída: ela fica fora da meta de agilidade. */
+export function marcarAnteriorAoCrm(id, { actor = 'sistema' } = {}) {
+  const atual = getOnboarding(id);
+  db.prepare(`UPDATE onboardings SET fora_da_meta = 1, updated_at = ? WHERE id = ?`).run(now(), id);
+  log('onboarding_meta', `${atual.franchise_name}: concluída antes do CRM, fora da meta de ${PRAZO_DIAS} dias`, { onboardingId: id, actor });
+  return getOnboarding(id);
+}
+
 export function setTask(id, taskKey, patch = {}) {
   const atual = getOnboarding(id);
   const task = atual.tasks.find((t) => t.task_key === taskKey);
@@ -445,7 +455,7 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
   ).get(...f.args).n;
   const tempoMedio = db.prepare(
     `SELECT AVG(julianday(concluded_at) - julianday(started_at)) v
-     FROM onboardings WHERE concluded_at IS NOT NULL${f.sql}`
+     FROM onboardings WHERE concluded_at IS NOT NULL AND fora_da_meta = 0${f.sql}`
   ).get(...f.args).v;
 
   // Franquias ainda em implantação que começaram fora do período escolhido.
@@ -457,7 +467,7 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
     : 0;
 
   const concluidasNoPeriodo = db.prepare(
-    `SELECT * FROM onboardings WHERE concluded_at IS NOT NULL AND situacao <> 'cancelado'${f.sql}`
+    `SELECT * FROM onboardings WHERE concluded_at IS NOT NULL AND situacao <> 'cancelado' AND fora_da_meta = 0${f.sql}`
   ).all(...f.args).map((r) => situacaoDoPrazo(r));
   const noPrazo = concluidasNoPeriodo.filter((p) => p.dentro).length;
   const emAndamento = ativos.filter((o) => o.stage !== 'concluido');
@@ -471,7 +481,8 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
       fora_do_prazo: concluidasNoPeriodo.length - noPrazo,
       taxa_no_prazo: concluidasNoPeriodo.length ? Math.round((noPrazo / concluidasNoPeriodo.length) * 100) : 0,
       em_andamento_estourado: emAndamento.filter((o) => o.prazo.situacao === 'estourado').length,
-      em_andamento_vence_logo: emAndamento.filter((o) => o.prazo.situacao === 'vence_logo').length
+      em_andamento_vence_logo: emAndamento.filter((o) => o.prazo.situacao === 'vence_logo').length,
+      anteriores_ao_crm: db.prepare(`SELECT COUNT(*) n FROM onboardings WHERE fora_da_meta = 1${f.sql}`).get(...f.args).n
     },
     etapas: STAGES.map((s) => ({ ...s, n: porEtapa[s.key] ?? 0 })),
     em_andamento: ativos.filter((o) => o.stage !== 'concluido').length,

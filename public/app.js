@@ -552,6 +552,8 @@ function seloDoPrazo(p) {
       return `<span class="sb-badge sb-badge--success sb-badge--plain prazo-ok" title="${titulo}">${ICON.check}No prazo · ${esc(diasTexto(p.dias_decorridos))}</span>`;
     case 'fora_do_prazo':
       return `<span class="sb-badge sb-badge--danger sb-badge--plain" title="${titulo}">${ICON.clock}Fora do prazo · ${esc(diasTexto(p.dias_decorridos))}</span>`;
+    case 'anterior':
+      return `<span class="sb-badge sb-badge--plain" title="Concluída antes do CRM: fica fora da meta de ${p.dias} dias">${ICON.check}Antes do CRM</span>`;
     case 'estourado':
       return `<span class="sb-badge sb-badge--danger sb-badge--plain" title="${titulo}">${ICON.clock}Atrasada ${esc(diasTexto(p.dias_restantes))}</span>`;
     case 'vence_logo':
@@ -626,7 +628,7 @@ async function renderOnboarding() {
       label: `No prazo de ${unidade}`,
       value: pz.concluidas ? `${pz.taxa_no_prazo}%` : '—',
       tom: pz.concluidas ? 'accent' : '',
-      delta: { tom: '', texto: pz.concluidas ? `${pz.no_prazo} de ${pz.concluidas} concluídas` : 'Nenhuma concluída ainda' },
+      delta: { tom: '', texto: pz.concluidas ? `${pz.no_prazo} de ${pz.concluidas} concluídas` : (pz.anteriores_ao_crm ? 'Nenhuma concluída pelo CRM ainda' : 'Nenhuma concluída ainda') },
       barra: pz.concluidas ? pz.taxa_no_prazo : null
     },
     { label: `Paradas há ${stats.alerta_dias}+ dias`, value: stats.paradas, tom: stats.paradas > 0 ? 'attention' : '' },
@@ -685,6 +687,7 @@ function textoDoPrazo(o) {
   const vence = new Date(p.vence_em).toLocaleDateString('pt-BR');
   const meta = `${p.dias} dias${p.uteis ? ' úteis' : ''}`;
   const base = `Início em <b>${esc(inicio)}</b> · meta de ${esc(meta)}, até <b>${esc(vence)}</b>`;
+  if (p.situacao === 'anterior') return `${seloDoPrazo(p)} Concluída antes do CRM, por isso fica fora da meta de ${esc(meta)}.`;
   if (p.situacao === 'no_prazo') return `${base}<br>${seloDoPrazo(p)} Concluída em ${esc(diasTexto(p.dias_decorridos))}.`;
   if (p.situacao === 'fora_do_prazo') return `${base}<br>${seloDoPrazo(p)} Concluída em ${esc(diasTexto(p.dias_decorridos))}.`;
   return `${base}<br>${seloDoPrazo(p)}`;

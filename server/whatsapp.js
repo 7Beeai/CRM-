@@ -15,7 +15,7 @@ import { rm, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
-import { fromWhatsappGroup, moveStage, STAGES, nomeDaFranquia } from './onboarding.js';
+import { fromWhatsappGroup, moveStage, marcarAnteriorAoCrm, STAGES, nomeDaFranquia } from './onboarding.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PASTA_SESSAO = process.env.CRM_WHATSAPP_SESSAO ?? join(root, 'data', 'whatsapp-sessao');
@@ -314,6 +314,8 @@ export async function importarGrupos(grupos, itens, convitePara, actor) {
         created_at: (grupo.criado_em ?? new Date().toISOString()).slice(0, 19).replace('T', ' ')
       });
       if (etapa !== 'nova') moveStage(franquia.id, etapa, { actor });
+      // Quem já chega concluído terminou antes do CRM: não entra na conta do bônus.
+      if (etapa === 'concluido') marcarAnteriorAoCrm(franquia.id, { actor });
       resultado.criadas.push(franquia.franchise_name);
       naEsteira.add(grupo.id);
     } catch (err) {

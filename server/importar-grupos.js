@@ -4,6 +4,11 @@
  *   npm run importar:whatsapp               mostra o que vai entrar, sem gravar
  *   npm run importar:whatsapp -- --confirmar  grava na esteira
  *   npm run importar:whatsapp -- --confirmar --etapa=openai
+ *   npm run importar:whatsapp -- --confirmar --etapa=concluido --nova="aracruz|guriri"
+ *
+ * --etapa vale para todos os grupos; --nova é uma expressão com os nomes que
+ * ficam em Nova franquia mesmo assim. Quem entra em Concluído é marcado como
+ * concluído antes do CRM e fica fora da meta de agilidade.
  *
  * Usa as mesmas variáveis do CRM: EVOLUTION_URL, EVOLUTION_INSTANCE,
  * EVOLUTION_API_KEY, CRM_WHATSAPP_FILTRO (obrigatório, ex.: "CDT") e
@@ -14,6 +19,9 @@ process.env.CRM_EVOLUTION_INTERVALO_MIN = '0'; // sem leitura periódica: o scri
 const args = process.argv.slice(2);
 const confirmar = args.includes('--confirmar');
 const etapa = args.find((a) => a.startsWith('--etapa='))?.slice('--etapa='.length) ?? 'nova';
+const naNova = args.find((a) => a.startsWith('--nova='))?.slice('--nova='.length);
+const exprNova = naNova ? new RegExp(naNova, 'i') : null;
+const etapaDe = (g) => (exprNova && exprNova.test(g.nome) ? 'nova' : etapa);
 
 const evolution = await import('./evolution.js');
 const { passaNoFiltro, configEntrada } = await import('./whatsapp.js');
@@ -40,8 +48,11 @@ const jaEstao = franquias.filter((g) => g.na_esteira);
 const data = (iso) => (iso ?? '').slice(0, 10) || '----------';
 console.log(`${grupos.length} grupos na instância ${st.instancia} · filtro "${configEntrada.filtro}"` +
   (configEntrada.ignorar ? ` · ignorando "${configEntrada.ignorar}"` : ''));
-console.log(`\nVão entrar na etapa "${STAGES.find((s) => s.key === etapa).label}" (${novos.length}):`);
-for (const g of novos) console.log(`  ${data(g.criado_em)}  ${g.franquia}   (${g.nome})`);
+for (const chave of new Set(novos.map(etapaDe))) {
+  const daEtapa = novos.filter((g) => etapaDe(g) === chave);
+  console.log(`\nVão entrar em "${STAGES.find((s) => s.key === chave).label}" (${daEtapa.length}):`);
+  for (const g of daEtapa) console.log(`  ${data(g.criado_em)}  ${g.franquia}   (${g.nome})`);
+}
 if (jaEstao.length) console.log(`\nJá estão na esteira (${jaEstao.length}): ${jaEstao.map((g) => g.franquia).join(', ')}`);
 if (ignorados.length) console.log(`\nIgnorados (${ignorados.length}): ${ignorados.map((g) => g.nome).join(', ')}`);
 
@@ -51,7 +62,7 @@ if (!confirmar) {
 }
 if (!novos.length) process.exit(0);
 
-const r = await evolution.importar(novos.map((g) => ({ id: g.id, stage: etapa })));
+const r = await evolution.importar(novos.map((g) => ({ id: g.id, stage: etapaDe(g) })));
 console.log(`\n${r.criadas.length} franquias importadas` +
   (r.ja_existiam.length ? `, ${r.ja_existiam.length} já estavam` : '') +
   (r.erros.length ? `, ${r.erros.length} com erro: ${r.erros.map((e) => e.erro).join('; ')}` : '') + '.');

@@ -56,13 +56,26 @@ npm run importar:whatsapp -- --confirmar  # grava na esteira, em Nova franquia
 
 O comando traz todo grupo que passa em `CRM_WHATSAPP_FILTRO` e não casa com
 `CRM_WHATSAPP_IGNORAR`. Com os valores acima, entram os 32 grupos CDT e fica
-de fora o `CDT.IA - Gestão`, que é interno. `--etapa=ctn` (ou outra etapa)
-coloca todos numa mesma etapa. Rodar de novo não duplica.
+de fora o `CDT.IA - Gestão`, que é interno. Rodar de novo não duplica.
 
-A data de início de cada franquia é a data de criação do grupo. Franquias
-antigas entram, portanto, com a meta de 5 dias estourada. Mova cada uma para a
-etapa real ou para Concluído logo depois de importar, para o indicador do
-bônus contar só as novas.
+- `--etapa=concluido` coloca todos na mesma etapa (qualquer etapa da esteira
+  serve).
+- `--nova="..."` deixa em Nova franquia os grupos cujo nome casa com a
+  expressão.
+
+Para a carga inicial da 7Bee, só três unidades estão começando:
+
+```bash
+npm run importar:whatsapp -- --confirmar --etapa=concluido --nova="aracruz|guriri|barra de s[aã]o francisco"
+```
+
+Franquias que entram direto em Concluído aparecem com o selo **Antes do CRM**.
+Elas contam em Concluídas, mas ficam fora da meta de 5 dias e da média de dias
+até concluir, porque terminaram antes de o CRM medir.
+
+A data de início de cada franquia é a data de criação do grupo. Se o
+onboarding começou depois disso, corrija em **Editar dados → Data de início**.
+Assim o prazo de 5 dias passa a contar do dia certo.
 
 **Escolhendo grupo a grupo, pela tela.**
 

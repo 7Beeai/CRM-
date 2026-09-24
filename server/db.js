@@ -160,6 +160,11 @@ export function log(kind, detail, { messageId = null, contactId = null, onboardi
   ).run(messageId, contactId, onboardingId, kind, detail, actor);
 }
 
+// Franquias que já estavam concluídas antes do CRM: ficam fora da meta de 5 dias.
+if (!new Set(db.prepare(`PRAGMA table_info(onboardings)`).all().map((c) => c.name)).has('fora_da_meta')) {
+  db.exec(`ALTER TABLE onboardings ADD COLUMN fora_da_meta INTEGER NOT NULL DEFAULT 0`);
+}
+
 // Ajustes pequenos que precisam sobreviver a um reinício, como a última leitura da Evolution.
 db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`);
 

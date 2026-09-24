@@ -46,6 +46,7 @@ Cada card mostra onde a franquia está em relação à meta:
 | Em andamento, passou da meta | Atrasada 4 dias (vermelho) |
 | Concluída dentro da meta | No prazo · 4 dias (verde, com brilho) |
 | Concluída depois da meta | Fora do prazo · 31 dias (vermelho) |
+| Importada já concluída | Antes do CRM (neutro, fora da meta e da média) |
 
 O indicador **No prazo de 5 dias** mostra a porcentagem das franquias concluídas
 dentro da meta, por exemplo "3 de 4 concluídas". Ele segue o filtro de período,
