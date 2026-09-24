@@ -4,7 +4,11 @@ import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as api from './api.js';
 import * as onb from './onboarding.js';
-import * as whats from './whatsapp.js';
+import * as baileys from './whatsapp.js';
+import * as evolution from './evolution.js';
+
+// Com a Evolution configurada, a tela do WhatsApp lê da instância dela; sem ela, usa o QR code.
+const whats = evolution.configurado ? evolution : baileys;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = join(root, 'public');
@@ -108,9 +112,15 @@ const server = createServer(async (req, res) => {
       return send(res, 201, onb.fromWhatsappGroup(await readJson(req)));
     }
 
-    // Conexão com o WhatsApp do CS pela leitura de QR code.
+    // Conexão com o WhatsApp do CS: Evolution API ou leitura de QR code.
     if (pathname.startsWith('/api/whatsapp/')) {
       const acao = pathname.slice('/api/whatsapp/'.length);
+      // Eventos de grupo vindos da Evolution. O token pode vir no cabeçalho ou em ?token=.
+      if (acao === 'evolution-webhook' && req.method === 'POST') {
+        if (!evolution.configurado) return send(res, 404, { error: 'A Evolution não está configurada.' });
+        if (TOKEN && !webhookAuthorized(req) && q.token !== TOKEN) return send(res, 401, { error: 'Token inválido.' });
+        return send(res, 200, await evolution.receberEvento(await readJson(req)));
+      }
       if (acao === 'status' && req.method === 'GET') return send(res, 200, await whats.status());
       if (acao === 'conectar' && req.method === 'POST') return send(res, 200, await whats.conectar());
       if (acao === 'desconectar' && req.method === 'POST') return send(res, 200, await whats.desconectar());

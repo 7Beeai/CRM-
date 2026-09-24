@@ -32,6 +32,8 @@ Variáveis de ambiente:
 | `CRM_ONBOARDING_ALERTA_DIAS` | dias parado até sinalizar a franquia | `7` |
 | `CRM_ONBOARDING_PRAZO_DIAS` | meta de dias para concluir o onboarding | `5` |
 | `CRM_ONBOARDING_PRAZO_UTEIS` | `1` conta a meta em dias úteis | dias corridos |
+| `EVOLUTION_URL`, `EVOLUTION_INSTANCE`, `EVOLUTION_API_KEY` | lê o WhatsApp do CS pela Evolution API, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) | vazio (usa QR code) |
+| `CRM_WHATSAPP_FILTRO` | só grupos com esse nome entram sozinhos na esteira, ex.: `CDT` | vazio (todos) |
 
 ## As abas
 
@@ -63,8 +65,9 @@ atalho que abre o grupo dela no WhatsApp.
 
 Franquias entram na esteira pelo botão **Nova franquia**, pela importação dos
 grupos do WhatsApp do CS ou sozinhas, quando um grupo novo aparece no WhatsApp
-conectado. A conexão é feita pela leitura de um QR code dentro do próprio CRM;
-o passo a passo e os cuidados estão em [`docs/WHATSAPP.md`](docs/WHATSAPP.md).
+conectado. A conexão usa a Evolution API, onde o número do Guilherme já está
+conectado, ou, sem ela, a leitura de um QR code dentro do próprio CRM. O passo a
+passo e os cuidados estão em [`docs/WHATSAPP.md`](docs/WHATSAPP.md).
 
 **Contatos** guarda quem é quem: empresa, canais, etapa no funil, responsável e
 observações. Marcar alguém como cliente ativo faz as mensagens dessa pessoa
@@ -159,7 +162,7 @@ entra vinculada a ele.
 | `GET /api/marca` | qual arquivo da abelha usar e se ele é animado |
 | `GET/POST /api/onboarding` | esteira de onboarding, ver [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
 | `POST /api/onboarding/whatsapp-group` | abre a franquia a partir de um grupo novo do WhatsApp |
-| `/api/whatsapp/…` | conexão por QR code e importação de grupos, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) |
+| `/api/whatsapp/…` | conexão pela Evolution ou por QR code e importação de grupos, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) |
 
 ## Estrutura
 
@@ -172,6 +175,7 @@ server/index.js       servidor HTTP e rotas
 server/seed.js        dados de exemplo
 server/periodo.js     filtro de período compartilhado
 server/whatsapp.js    conexão com o WhatsApp por QR code e importação de grupos
+server/evolution.js   leitura dos grupos pela Evolution API (sem QR code)
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
 public/styles.css     camada da aplicação, só com tokens

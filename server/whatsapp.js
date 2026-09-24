@@ -85,7 +85,7 @@ function guardarGrupo(meta) {
 const soDigitos = (jid) => String(jid ?? '').split('@')[0].split(':')[0].replace(/\D/g, '');
 const mesmoNumero = (a, b) => soDigitos(a) && soDigitos(a) === soDigitos(b);
 
-function jaNaEsteira() {
+export function jaNaEsteira() {
   return new Set(
     db.prepare(`SELECT whatsapp_group_id FROM onboardings WHERE whatsapp_group_id IS NOT NULL`)
       .all().map((r) => r.whatsapp_group_id)
@@ -102,20 +102,33 @@ export function listarGrupos() {
 
 async function entradaAutomatica(meta) {
   const grupo = guardarGrupo(meta);
-  if (!grupo || !AUTO_ENTRADA) return;
-  if (FILTRO && !FILTRO.test(grupo.nome)) return;
-  if (jaNaEsteira().has(grupo.id)) return;
+  if (grupo) levarGrupoNovo(grupo, 'WhatsApp');
+}
+
+/**
+ * Grupo novo no WhatsApp do CS: vira franquia na coluna Nova franquia, se a
+ * entrada automática estiver ligada e o nome passar pelo filtro. Serve para as
+ * duas conexões (QR code e Evolution).
+ */
+export function levarGrupoNovo(grupo, origem = 'WhatsApp') {
+  if (!AUTO_ENTRADA) return null;
+  if (FILTRO && !FILTRO.test(grupo.nome)) return null;
+  if (jaNaEsteira().has(grupo.id)) return null;
   try {
-    fromWhatsappGroup({
+    const franquia = fromWhatsappGroup({
       group_id: grupo.id,
       group_name: grupo.nome,
       created_at: (grupo.criado_em ?? new Date().toISOString()).slice(0, 19).replace('T', ' ')
     });
-    console.log(`WhatsApp: grupo novo "${grupo.nome}" entrou na esteira.`);
+    console.log(`${origem}: grupo novo "${grupo.nome}" entrou na esteira.`);
+    return franquia;
   } catch (err) {
-    console.error('WhatsApp: não consegui criar a franquia do grupo novo:', err.message);
+    console.error(`${origem}: não consegui criar a franquia do grupo novo:`, err.message);
+    return null;
   }
 }
+
+export const configEntrada = { automatica: AUTO_ENTRADA, filtro: FILTRO ? FILTRO.source : null };
 
 /* -------------------------------- conexão --------------------------------- */
 
@@ -256,6 +269,22 @@ export async function retomarSessao() {
  */
 export async function importar(itens = []) {
   if (estado.fase !== 'conectado') throw bad('Conecte o WhatsApp antes de importar.', 409);
+
+  return importarGrupos(grupos, itens, async (grupo) => {
+    if (grupo.eu_admin && sock && !SIMULADO) {
+      try { return `https://chat.whatsapp.com/${await sock.groupInviteCode(grupo.id)}`; } catch { /* sem permissão */ }
+    } else if (SIMULADO && grupo.convite) {
+      return grupo.convite;
+    }
+    return '';
+  }, 'importação do WhatsApp');
+}
+
+/**
+ * Parte comum da importação. `grupos` é o Map id → grupo lido da conexão;
+ * `convitePara(grupo)` devolve o link de convite, ou '' quando não há permissão.
+ */
+export async function importarGrupos(grupos, itens, convitePara, actor) {
   if (!Array.isArray(itens) || !itens.length) throw bad('Escolha pelo menos um grupo para importar.');
   if (itens.length > 500) throw bad('Importe no máximo 500 grupos por vez.');
 
@@ -268,13 +297,7 @@ export async function importar(itens = []) {
     if (!grupo) { resultado.erros.push({ id: item?.id, erro: 'Grupo não encontrado nesta conexão.' }); continue; }
     if (naEsteira.has(grupo.id)) { resultado.ja_existiam.push(grupo.nome); continue; }
     const etapa = etapas.has(item.stage) ? item.stage : 'nova';
-
-    let convite = '';
-    if (grupo.eu_admin && sock && !SIMULADO) {
-      try { convite = `https://chat.whatsapp.com/${await sock.groupInviteCode(grupo.id)}`; } catch { /* sem permissão */ }
-    } else if (SIMULADO && grupo.convite) {
-      convite = grupo.convite;
-    }
+    const convite = await convitePara(grupo);
 
     try {
       const franquia = fromWhatsappGroup({
@@ -283,7 +306,7 @@ export async function importar(itens = []) {
         group_invite_link: convite,
         created_at: (grupo.criado_em ?? new Date().toISOString()).slice(0, 19).replace('T', ' ')
       });
-      if (etapa !== 'nova') moveStage(franquia.id, etapa, { actor: 'importação do WhatsApp' });
+      if (etapa !== 'nova') moveStage(franquia.id, etapa, { actor });
       resultado.criadas.push(franquia.franchise_name);
       naEsteira.add(grupo.id);
     } catch (err) {

@@ -933,6 +933,23 @@ function desenharWhats() {
     return;
   }
 
+  const evo = st.provedor === 'evolution';
+
+  if (evo && (st.fase === 'desligado' || st.fase === 'erro')) {
+    corpo.innerHTML = `
+      ${st.erro ? `<div class="whats__erro">${esc(st.erro)}</div>` : ''}
+      <p>O CRM lê o WhatsApp do Guilherme pela <b>Evolution</b>, na instância <b>${esc(st.instancia)}</b>, a mesma que o agente usa.
+        Ele lê só os <b>nomes dos grupos</b>, a data de criação e quantas pessoas participam. Nenhuma mensagem é lida.</p>
+      <p>Não precisa de QR code: o número já está conectado na Evolution.</p>
+      <div><button class="sb-btn sb-btn--primary" type="button" data-whats="conectar">${st.erro ? 'Tentar de novo' : 'Ler grupos do WhatsApp'}</button></div>`;
+    return;
+  }
+
+  if (evo && st.fase === 'conectando') {
+    corpo.innerHTML = '<p>Lendo os grupos na Evolution… Com muitos grupos isso leva alguns segundos.</p>';
+    return;
+  }
+
   if (st.fase === 'desligado' || st.fase === 'erro') {
     corpo.innerHTML = `
       ${st.erro ? `<div class="whats__erro">${esc(st.erro)}</div>` : ''}
@@ -974,18 +991,26 @@ function desenharWhats() {
   const visiveis = whats.grupos.filter((g) =>
     (!whats.soNovos || !g.na_esteira) &&
     (!termo || `${g.nome} ${g.franquia}`.toLowerCase().includes(termo)));
+  const marcaveis = visiveis.filter((g) => !g.na_esteira);
+  const todosMarcados = marcaveis.length > 0 && marcaveis.every((g) => whats.selecao.has(g.id));
   const opcoesEtapa = (sel) => onb.stages.map((e) =>
     `<option value="${e.key}"${e.key === sel ? ' selected' : ''}>${esc(e.label)}</option>`).join('');
 
   corpo.innerHTML = `
     <div class="whats__conectado">
-      <span>Conectado ao número <b>${esc(formatarNumero(st.numero))}</b> · ${st.grupos} grupos encontrados</span>
-      <button class="sb-btn sb-btn--sm sb-btn--danger" type="button" data-whats="desconectar">Desconectar</button>
+      ${evo
+        ? `<span>Evolution · instância <b>${esc(st.instancia)}</b>${st.numero ? ` · <b>${esc(formatarNumero(st.numero))}</b>` : ''} · ${st.grupos} grupos
+            ${st.ultima_leitura ? `<small>lidos às ${esc(new Date(st.ultima_leitura).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}${st.intervalo_min > 0 ? `, grupos novos conferidos a cada ${st.intervalo_min} min` : ''}</small>` : ''}</span>
+           <button class="sb-btn sb-btn--sm" type="button" data-whats="reler">Ler de novo</button>`
+        : `<span>Conectado ao número <b>${esc(formatarNumero(st.numero))}</b> · ${st.grupos} grupos encontrados</span>
+           <button class="sb-btn sb-btn--sm sb-btn--danger" type="button" data-whats="desconectar">Desconectar</button>`}
     </div>
     <p>Marque os grupos que são franquias e escolha em que etapa cada uma está hoje. O nome da franquia sai do nome do grupo.</p>
     <div class="sb-toolbar">
       <input type="search" class="sb-field sb-field--grow" id="whats-busca" placeholder="Buscar grupo…" value="${esc(whats.busca)}" aria-label="Buscar grupo" />
       <label class="whats__check"><input type="checkbox" id="whats-sonovos" ${whats.soNovos ? 'checked' : ''} />Só os que não estão na esteira</label>
+      ${marcaveis.length ? `<button class="sb-btn sb-btn--sm" type="button" data-whats="marcar-todos">
+        ${todosMarcados ? 'Desmarcar' : 'Marcar'} ${marcaveis.length === 1 ? 'o grupo da lista' : `os ${marcaveis.length} da lista`}</button>` : ''}
     </div>
     <div class="whats__lista" role="list">
       ${visiveis.length ? visiveis.map((g) => {
@@ -1029,9 +1054,25 @@ $('#whats-corpo').addEventListener('click', async (e) => {
   if (!acao) return;
   try {
     if (acao === 'conectar') {
+      whats.status = { ...whats.status, fase: 'conectando', erro: null };
+      desenharWhats();
       whats.status = await apiCall('/whatsapp/conectar', { method: 'POST' });
       desenharWhats();
       ciclo();
+    } else if (acao === 'marcar-todos') {
+      // Vale para o que a busca está mostrando, ex.: buscar "CDT" e marcar todas as unidades.
+      const termo = whats.busca.toLowerCase();
+      const marcaveis = whats.grupos.filter((g) => !g.na_esteira && (!termo || `${g.nome} ${g.franquia}`.toLowerCase().includes(termo)));
+      const todos = marcaveis.every((g) => whats.selecao.has(g.id));
+      for (const g of marcaveis) todos ? whats.selecao.delete(g.id) : whats.selecao.set(g.id, whats.selecao.get(g.id) ?? 'nova');
+      desenharWhats();
+    } else if (acao === 'reler') {
+      // Na Evolution, "conectar" de novo só relê a instância; nada é desconectado.
+      whats.status = { ...whats.status, fase: 'conectando' };
+      desenharWhats();
+      whats.status = await apiCall('/whatsapp/conectar', { method: 'POST' });
+      whats.grupos = whats.status.fase === 'conectado' ? await apiCall('/whatsapp/grupos') : [];
+      desenharWhats();
     } else if (acao === 'simular') {
       await apiCall('/whatsapp/simular-leitura', { method: 'POST' });
       ciclo();

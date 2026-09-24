@@ -159,3 +159,15 @@ export function log(kind, detail, { messageId = null, contactId = null, onboardi
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(messageId, contactId, onboardingId, kind, detail, actor);
 }
+
+// Ajustes pequenos que precisam sobreviver a um reinício, como a última leitura da Evolution.
+db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+
+export function lerAjuste(chave) {
+  return db.prepare(`SELECT value FROM settings WHERE key = ?`).get(chave)?.value ?? null;
+}
+
+export function gravarAjuste(chave, valor) {
+  db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`).run(chave, String(valor));
+}

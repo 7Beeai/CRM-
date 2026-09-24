@@ -402,6 +402,8 @@ export function fromWhatsappGroup(input = {}) {
 
 export function nomeDaFranquia(groupName) {
   return groupName
+    // Grupos das unidades CDT: "CDT - Guriri ES", "CDT.IA - Varginha", "IA CDT - Campo Limpo".
+    .replace(/^\s*(ia\s+)?cdt(\.ia)?\s*[-–—:|]\s*/i, '')
     .replace(/^\s*(onboarding|implanta[çc][ãa]o|suporte|grupo|equipe|time)\s*[-–—:|]\s*/i, '')
     .replace(/\s*[-–—|]\s*(onboarding|implanta[çc][ãa]o|suporte|oficial)\s*$/i, '')
     .replace(/\s*[×x]\s*7bee\s*$/i, '')
