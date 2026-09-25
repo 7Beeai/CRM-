@@ -54,9 +54,16 @@ motivo, e não manda nada no grupo.
 
 **Quem é da equipe 7Bee**
 
-O agente reconhece a equipe pelo número de quem escreve. A lista de números fica
-na configuração do fluxo no n8n, não no Git. Ainda falta confirmar o nome de
-dois números que aparecem em quase todos os grupos falando pela 7Bee.
+O agente reconhece a equipe pelo número de quem escreve. Se qualquer um destes
+já respondeu à pergunta, ele fica em silêncio:
+
+| Pessoa | Como aparece nos grupos |
+| --- | --- |
+| Guilherme | o próprio número da instância `Guilherme-7Bee`; o agente responde por ele |
+| Victor | número pessoal, apresentado nos grupos como diretor operacional, e o número da instância `Victor - 7Bee` |
+| André | dois números: um que abre os grupos de onboarding e outro com o nome dele no perfil |
+
+Os números completos ficam na configuração do fluxo no n8n, não no Git.
 
 **O que ele sabe**
 
