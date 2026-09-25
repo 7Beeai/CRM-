@@ -16,6 +16,45 @@ enviada e a avaliação do time sobre o acerto do agente.
 5. O Guilherme responde e avalia se o agente acertou. Essa avaliação vira o
    material para ajustar o agente.
 
+## Regras de atendimento (definidas pela 7Bee)
+
+Estas regras valem para o agente que vai atender os grupos das franquias CDT
+pelo WhatsApp do Guilherme. O fluxo do agente ainda vai ser montado no n8n.
+
+**Quando responder**
+
+- Só quando houver uma pergunta. Recado, agradecimento, "ok" e figurinha não
+  recebem resposta.
+- Se alguém da 7Bee (Guilherme, Victor ou André) já respondeu à pergunta, o
+  agente fica em silêncio. Isso vale também se a pessoa responder enquanto o
+  agente ainda está decidindo.
+- Funciona 24 horas por dia, inclusive fora do horário comercial.
+
+**O que nunca responde, sempre escala para o Guilherme**
+
+| Tema | Exemplos |
+| --- | --- |
+| Cobrança e valores | boleto, mensalidade, reajuste, desconto, nota fiscal |
+| Contrato | cláusulas, renovação, multa, troca de plano |
+| Cancelamento | pedido ou ameaça de cancelar, pausa do serviço |
+| Reclamação | insatisfação, cobrança de prazo, tom de irritação |
+| Problema técnico | agente fora do ar, erro, integração parada, acesso que não funciona |
+
+Nesses casos, o agente registra a mensagem no CRM com `decision: "escalou"` e o
+motivo, e não manda nada no grupo.
+
+**Como se apresenta**
+
+- Assina como Guilherme, no número do Guilherme.
+- Ponto em aberto: o que responder se a franquia perguntar diretamente se está
+  falando com um robô.
+
+**O que ele sabe**
+
+- A base de conhecimento vem das respostas que o Guilherme e o Victor, que fazia
+  a função antes, já deram nos grupos CDT.
+- O Guilherme revisa a base antes de o agente entrar no ar.
+
 ## As três decisões possíveis
 
 | Decisão | O que significa | Onde a mensagem vai parar |
