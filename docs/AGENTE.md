@@ -34,14 +34,15 @@ pelo WhatsApp do Guilherme. O fluxo do agente ainda vai ser montado no n8n.
 
 | Tema | Exemplos |
 | --- | --- |
-| Cobrança e valores | **qualquer coisa relacionada**: a cobrança feita pela IA (réguas, disparos, pagamentos, baixas, reembolso, descontos, campanhas), a cobrança da 7Bee à franquia e qualquer valor ou custo (7Bee, OpenAI, Meta, números) |
+| Cobrança e valores da 7Bee | a 7Bee cobrando a franquia: mensalidade, repasse, fechamento mensal, boleto, reajuste, desconto, nota fiscal |
 | Contrato | cláusulas, renovação, multa, troca de plano |
 | Cancelamento | pedido ou ameaça de cancelar, pausa do serviço |
 | Reclamação | insatisfação, cobrança de prazo, tom de irritação |
 | Problema técnico | agente fora do ar, erro, integração parada, acesso que não funciona |
 
-A regra vale para tudo que for **relacionado** a esses temas, não só para a
-pergunta direta. Na dúvida, o agente escala.
+As dúvidas sobre **como funciona a cobrança por IA** (réguas, disparos, listas,
+baixas) não entram nessa regra: o agente responde, conforme a base de
+conhecimento.
 
 Nesses casos, o agente registra a mensagem no CRM com `decision: "escalou"` e o
 motivo, e não manda nada no grupo.

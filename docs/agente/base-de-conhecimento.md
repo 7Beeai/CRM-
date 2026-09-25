@@ -17,21 +17,6 @@
 | ✅ | Responde sozinho. |
 | ⚠️ | Responde a parte geral e escala o que depende da unidade. Por exemplo: pede a matrícula e passa para o Guilherme. |
 | ⛔ | Não responde. Registra no CRM como escalada e fica em silêncio no grupo. |
-| ❓ | A confirmar se é "relacionado a cobrança". Até a confirmação, o agente escala. |
-
-**Regra que vale acima de tudo:** o agente não responde **nada relacionado a**
-cobrança e valores, contrato, cancelamento, reclamação ou problema técnico.
-
-- "Cobrança" inclui a cobrança feita pela IA: réguas, disparos aos
-  inadimplentes, pagamentos, baixas, reembolsos, descontos e campanhas. Inclui
-  também a cobrança da 7Bee à franquia.
-- "Valores" inclui qualquer valor ou custo, de quem for: 7Bee, OpenAI, Meta,
-  números e campanhas.
-- Na dúvida, o agente escala.
-
-Ao montar o agente no n8n, **carregue só os itens ✅ e ⚠️**. O texto dos itens
-⛔ e ❓ fica aqui só como referência para a equipe, e o agente não pode ter
-acesso a ele.
 
 A frequência entre parênteses é aproximada: quantas vezes o tema apareceu no
 histórico.
@@ -65,13 +50,9 @@ A implantação tem três fases:
 
 ---
 
-## 1. Rotina diária das planilhas (Power BI) — o tema mais frequente (~47) ❓
+## 1. Rotina diária das planilhas (Power BI) — o tema mais frequente (~47)
 
-> **A confirmar.** A planilha de inadimplência alimenta a cobrança, então pode
-> contar como "relacionado a cobrança". Se for liberada, o agente responde tudo
-> desta seção menos o último item. Até lá, escala.
-
-### Quais planilhas subir, onde e em que horário ❓
+### Quais planilhas subir, onde e em que horário ✅
 São 2 relatórios do Power BI em XLSX, cada um na sua pasta do Drive:
 
 1. **Inadimplência** (para a cobrança): todos os dias, até **8:30**, na
@@ -88,24 +69,24 @@ Como subir:
 - Atenção para não inverter as pastas. Se inverter, o sistema pode tratar
   cliente em dia como devedor.
 
-### Por que até 8:30 ❓
+### Por que até 8:30 ✅
 O primeiro disparo do dia sai por volta das **8:50** e é o de melhor resultado. O
 disparo seguinte sai às 11:30. Começar por volta das 9h rende bem mais do que
 começar depois das 10h.
 
-### O BI não atualizou. Subo a lista antiga ou espero? ❓
+### O BI não atualizou. Subo a lista antiga ou espero? ✅
 - Não suba a lista antiga: essa a gente já tem.
 - Espere o BI atualizar e suba assim que possível. Avise aqui no grupo quando o
   BI atrasar.
 - O sistema espera uma lista nova **até as 10h**. Depois disso, trabalha com a
   lista do dia anterior, tirando quem já pagou pela IA.
 
-### Dá para ter um prazo maior que 8:30? ❓
+### Dá para ter um prazo maior que 8:30? ✅
 A gente trabalha com esse padrão em todas as unidades. A tolerância até as 10h
 existe justamente para os atrasos do BI, mas cada minuto depois das 8:30 pesa
 no resultado do dia.
 
-### Dias sem expediente, domingos e feriados ❓
+### Dias sem expediente, domingos e feriados ✅
 - Nos dias de disparo sem lista nova, a IA usa a do dia anterior, tirando quem
   já pagou.
 - **Aos domingos não há disparos.**
@@ -114,7 +95,7 @@ no resultado do dia.
 - Nos feriados, a estratégia é reduzida.
 - Avise os feriados municipais com antecedência.
 
-### Podemos tirar clientes ou colunas para dividir a cobrança com a equipe? ⛔
+### Podemos tirar clientes ou colunas para dividir a cobrança com a equipe? ✅
 Mantenha a lista completa, no formato do BI. Remover colunas ou clientes quebra
 a sincronização. Para dividir o trabalho:
 
@@ -122,9 +103,9 @@ a sincronização. Para dividir o trabalho:
 - a equipe trabalha da régua 2 em diante;
 - a gente configura a IA para cobrar só NR e R1.
 
-### Subi e não sincronizou ⛔
-Problema técnico. Referência para a equipe: conferir se o relatório certo está
-na pasta certa e em XLSX, e forçar a sincronização.
+### Subi e não sincronizou ⚠️
+Confira se o relatório certo está na pasta certa e em XLSX. Se estiver, avise
+aqui que a gente força a sincronização. Neste caso, o agente escala.
 
 ---
 
@@ -165,7 +146,7 @@ preciso alguém com o chip novo em mãos. O agente escala.
 
 ---
 
-## 3. OpenAI: conta e cartão (~26)
+## 3. OpenAI: conta, cartão e custo (~26)
 
 ### Para que serve e como é criada ✅
 É a conta da **plataforma de API da OpenAI**, que paga os "pensamentos" da IA.
@@ -183,25 +164,29 @@ Como criar:
 1. Entre com o e-mail da conta.
 2. Acesse `{link de billing da OpenAI}` e clique em "adicionar detalhes de
    pagamento".
-3. Coloque o crédito inicial e configure a recarga automática. Os valores
-   recomendados são passados pela equipe: pergunta sobre valores escala.
+3. Recomendamos comprar **US$ 15** de início e configurar **recarga de US$ 10
+   quando o saldo ficar abaixo de US$ 5**.
 4. Confira no canto inferior esquerdo se está logado na conta certa.
 5. Avise quando terminar.
 
 O cartão precisa aceitar transações internacionais.
 
-### Quanto custa por mês ⛔
-Valores. Referência para a equipe: o custo depende do uso, em média de US$ 15 a
-US$ 50 por mês, e o crédito inicial recomendado é de US$ 15, com recarga de
-US$ 10 quando o saldo fica abaixo de US$ 5.
+### Quanto custa por mês ✅
+Depende do uso. Em média, fica entre US$ 15 e US$ 50 por mês, proporcional ao
+volume de conversas: se a IA está conversando mais, está trazendo mais
+resultado. Esse saldo **não paga os disparos de WhatsApp**, que são cobrados
+pela Meta.
 
-### Qual a diferença entre o cartão da OpenAI e o da Meta ⛔
-Cobrança e valores. Referência para a equipe: a OpenAI é pré-paga e cobra os
-tokens da IA. A Meta é pós-paga e cobra os disparos.
+### Qual a diferença entre o cartão da OpenAI e o da Meta ✅
+- **OpenAI**, pré-pago: paga os tokens da IA.
+- **Meta**, pós-pago: paga as mensagens de disparo.
+
+São duas cobranças separadas, direto no cartão da unidade. Nenhuma das duas é a
+mensalidade da 7Bee. Pergunta sobre valores da 7Bee é ⛔.
 
 ---
 
-## 4. Meta: cartão, BM e limites (~45)
+## 4. Meta: cartão dos disparos, BM e limites (~45)
 
 ### Como cadastrar o cartão na Meta ✅
 É a **última etapa da parte de vocês** antes de começar.
@@ -213,23 +198,27 @@ tokens da IA. A Meta é pós-paga e cobra os disparos.
 4. Se der erro (por exemplo, cartão já usado em outro BM), cadastre como
    **forma de pagamento da empresa**, em "Adicionar forma de pagamento da
    empresa". Depois a gente vincula.
-5. Avise quando terminar, que a gente confere.
+5. Quando der certo, a Meta faz uma cobrança inicial de cerca de US$ 10.
+6. Avise quando terminar, que a gente confere.
 
 O cartão precisa aceitar transações internacionais.
 
-### A Meta cobra todo dia? Quanto vai custar? ⛔
-Cobrança e valores. Referência para a equipe: no começo a Meta cobra todo dia e
-depois espaça as cobranças. O valor acompanha o volume de disparos. Na fatura
-aparece como FACEBOOK ou META.
+### A Meta cobra todo dia? Quanto vai custar? ✅
+No começo, a Meta cobra diariamente. Com o tempo ela ganha confiança e espaça as
+cobranças. O valor é proporcional ao volume de disparos: quanto mais gente a
+gente contata, mais a gente recupera. Na fatura aparece como FACEBOOK ou META.
+Todas as cobranças ficam na área de atividade de pagamentos do BM.
 
-### Apareceu cobrança do Facebook no cartão ⛔
-Cobrança e valores. Referência para a equipe: é a Meta cobrando os disparos, e
-não a 7Bee.
+### Apareceu cobrança do Facebook no cartão ✅
+É dos disparos de WhatsApp, cobrados pela Meta. Não é da IA nem da 7Bee.
 
-### O pagamento na Meta foi recusado ⛔
-Cobrança e problema técnico. Referência para a equipe: sem cartão válido os
-disparos param. Conferir o limite ou cadastrar outro cartão como forma de
-pagamento da empresa.
+### O pagamento na Meta foi recusado ⚠️
+Sem cartão válido, os disparos param.
+
+- Confira o limite do cartão.
+- Se precisar, cadastre outro cartão como forma de pagamento da empresa.
+
+Consultar o valor gasto é com a equipe, então o agente escala.
 
 ### O que é o BM e o que precisamos fazer ✅
 O BM (portfólio de negócios da Meta) é onde ficam as contas de WhatsApp que
@@ -246,13 +235,12 @@ Normalmente o convite precisa ser aprovado por outro admin do mesmo BM. Confira
 também o spam e a aba Social do e-mail. Se o convite expirar, é preciso
 reenviar.
 
-### Por que só ~250 disparos por dia? ⛔
+### Por que só ~250 disparos por dia? ⚠️
 Enquanto o BM está em verificação, a Meta limita a **250 mensagens por dia**.
 Depois da aprovação, o limite sobe para cerca de 2 mil. Nos primeiros dias
 também é normal a Meta deixar o número "em alerta": nesse período a gente reduz
 a cobrança e aumenta o relacionamento, liberando as réguas aos poucos. A
-situação exata do BM de cada unidade é com a equipe. O tema envolve cobrança,
-então o texto acima serve só de referência para a equipe.
+situação exata do BM de cada unidade é com a equipe, então o agente escala.
 
 ### Apareceu outra empresa como parceira no BM ✅
 É a conta que conecta os nossos apps aos números de vocês, como um cabo de
@@ -281,7 +269,7 @@ app do Facebook e vá em Notificações. Também dá para receber por e-mail.
 O tempo de implantação depende diretamente da velocidade com que as etapas de
 vocês são concluídas.
 
-### Onde envio os documentos? Quais? ❓
+### Onde envio os documentos? Quais? ✅
 Envie **somente pelo `{link de envio de documentos}`**: nunca no grupo, nem por
 e-mail.
 
@@ -290,9 +278,6 @@ e-mail.
 - Várias pessoas podem subir arquivos pelo mesmo link.
 - O próprio link mostra o que ainda falta.
 - Não recebeu o e-mail do contrato? Olhe o spam. A gente também pode reenviar.
-
-> **A confirmar.** A resposta cita o contrato só como documento a enviar, sem
-> falar das cláusulas. Pode contar como "relacionado a contrato"?
 
 ### Falta alguma coisa? Quando começa? ⚠️
 Resposta geral: quando tudo estiver concluído, a gente começa em até 48 horas.
@@ -304,11 +289,9 @@ e escala.
 **Integração com o CRM:** com o CRM, o agente consegue consultar em que etapa da
 esteira a unidade está e responder de forma exata.
 
-### Quando começa o período de teste de 60 dias? ❓
+### Quando começa o período de teste de 60 dias? ✅
 No primeiro dia em que os disparos começarem. A foto do grupo é trocada para
 marcar esse início.
-
-> **A confirmar.** O período de teste é uma condição do contrato.
 
 ### Podemos fazer uma reunião? ⚠️
 Sim. A gente recomenda que a reunião seja no dia do início, ou depois dele, para
@@ -316,12 +299,9 @@ já ter dados reais. O horário é combinado com a equipe, então o agente escal
 
 ---
 
-## 6. Gateway de pagamento (AbacatePay) (~21) ⛔
+## 6. Gateway de pagamento (AbacatePay) (~21)
 
-> A conta do gateway existe para receber os pagamentos da cobrança. Só a
-> verificação facial fica a confirmar.
-
-### Quem faz a verificação facial (KYC)? ❓
+### Quem faz a verificação facial (KYC)? ✅
 **Basta um sócio**, quem conseguir fazer mais rápido, pelo `{link de
 verificação}`.
 
@@ -333,29 +313,27 @@ verificação}`.
   configuração no gov.br.
 - Às vezes o gateway pede um segundo sócio. Quando pedir, a gente avisa.
 
-### Para que serve a conta no gateway? ⛔
+### Para que serve a conta no gateway? ✅
 - É uma conta de recebimento **complementar**. O pagamento principal é pelo link
   de conciliação do CTN, que já cai conciliado.
 - Os valores que entram pelo gateway (baixados no CTN como "DIRETO NO CARTÃO -
   CEF") ficam nessa conta.
 - Para retirar esses valores, é preciso fazer saques periodicamente.
 
-### Não consigo sacar / o código não chega no e-mail ⛔
+### Não consigo sacar / o código não chega no e-mail ✅
 O código de saque vem de um **aplicativo autenticador**, não do e-mail. Se ainda
 não cadastraram o autenticador, é preciso cadastrar. Se outra pessoa já
 cadastrou, peçam o código a ela.
 
-### Entrei e não aparece valor ⛔
+### Entrei e não aparece valor ✅
 Provavelmente a conta está no modo teste: clique em "Ir para produção". Se der
 erro, recarregue com Ctrl+Shift+R ou use uma janela anônima.
 
 ---
 
-## 7. CTN, baixas e formas de pagamento (~32) ⛔
+## 7. CTN, baixas e formas de pagamento (~32)
 
-> Tudo aqui é cobrança. Os textos ficam só como referência para a equipe.
-
-### Para que serve o acesso ao CTN (Gerente do Cartão)? ❓
+### Para que serve o acesso ao CTN (Gerente do Cartão)? ✅
 É por esse acesso que a IA gera, na hora, o link de conciliação de cada cliente
 e dá as baixas automáticas.
 
@@ -363,7 +341,7 @@ Como criar: um usuário **Operador de Adimplência** com o perfil **GERENTE DO
 CARTÃO**. Selecione o perfil e clique em Gravar. O CPF a usar é informado pela
 equipe.
 
-### Como o cliente paga? ⛔
+### Como o cliente paga? ✅
 - Pelo link de conciliação da franqueadora, com cartão ou PIX. O pagamento cai
   conciliado no CTN.
 - Pagamentos que entram por fora do link recebem baixa automática em poucos
@@ -373,17 +351,17 @@ equipe.
 - Dá para tirar o PIX do link, mas pela nossa experiência o resultado cai
   bastante.
 
-### Qual forma de pagamento a IA usa na baixa manual? ⛔
+### Qual forma de pagamento a IA usa na baixa manual? ✅
 "DIRETO NO CARTÃO - CEF". Isso só acontece quando o link de conciliação falha e
 o cliente paga pelo caminho antigo, e o dinheiro fica no gateway. A unidade pode
 escolher outra forma de lançamento: é só avisar.
 
-### A IA cobra só o que está em 3C? ⛔
+### A IA cobra só o que está em 3C? ✅
 Sim. Ela cobra o que está na lista de inadimplentes do BI. Cobra todas as
 parcelas que o CTN libera; parcelas que ainda estão no motor de recorrência
 entram depois, automaticamente.
 
-### Cliente em dia recebendo cobrança / pagou e não teve baixa ⛔
+### Cliente em dia recebendo cobrança / pagou e não teve baixa ⚠️
 A IA segue a lista do BI. Coisas para conferir:
 
 - se o cliente estava na lista do dia;
@@ -391,10 +369,10 @@ A IA segue a lista do BI. Coisas para conferir:
 - se a lista subiu atrasada;
 - se a mensagem é mesmo da IA (o número dela tem foto própria).
 
-A equipe pede a **matrícula** para investigar.
+O agente pede a **matrícula** e escala.
 
-### Excluir um cliente da cobrança ⛔
-A exclusão é feita pela equipe, a partir da matrícula.
+### Excluir um cliente da cobrança ⚠️
+O agente pede a matrícula e escala. A exclusão é feita pela equipe.
 
 ### Reembolso, estorno, pagamento duplicado ⛔
 O agente escala (problema técnico). Referência: o reembolso pelo painel só
@@ -450,11 +428,11 @@ Use um dos templates pré-aprovados, no botão do meio do chat. O cliente precis
 responder ao template para a conversa continuar. Se não fizer sentido
 continuar, encerre a conversa como não resolvida.
 
-### O que é o valor de baixo no Dashboard? ⛔
+### O que é o valor de baixo no Dashboard? ✅
 É a projeção de recebimento do mês. No primeiro mês ela fica baixa, porque
 considera o começo do mês zerado. Com meses completos, ela fica precisa.
 
-### O que significa "Concluiu (declarado)"? ⛔
+### O que significa "Concluiu (declarado)"? ✅
 O cliente disse que já pagou ou mandou comprovante. O status muda quando a IA
 confirma o pagamento no CTN.
 
@@ -466,24 +444,21 @@ o agente escala (problema técnico).
 
 ## 9. Como a IA de cobrança e relacionamento funciona (~29)
 
-> Tudo o que é da cobrança escala. Sobre o relacionamento e os ajustes no que a
-> IA fala, o agente responde.
-
-### Quantas mensagens a IA manda por dia? ⛔
+### Quantas mensagens a IA manda por dia? ✅
 Até 4, conforme a régua e a estratégia. Quando o cliente responde, os disparos
 param e a IA passa a conversar com ele. Se o cliente tem uma experiência
 negativa (xingou, por exemplo), a IA se bloqueia e não contata mais esse
 cliente.
 
-### O que é cada régua? ⛔
+### O que é cada régua? ✅
 Segue o padrão do BI: régua 1 é 1 mensalidade em aberto, régua 2 são 2
 mensalidades, e assim por diante. Cada régua tem uma abordagem própria. A gente
 libera as réguas aos poucos para proteger o BM.
 
-### A IA faz ligação? ⛔
+### A IA faz ligação? ✅
 Não. Ela atua só pelo WhatsApp.
 
-### A IA dá desconto ou faz promoção? ⛔
+### A IA dá desconto ou faz promoção? ✅
 Por princípio não: a régua é feita para recuperar o valor integral. De vez em
 quando oferecemos campanhas pontuais com adesão opcional, como a Desenrola
 (seção 11).
@@ -494,8 +469,9 @@ clientes. Depois dos 60 dias, a unidade pode mandar campanhas locais.
 
 ### A IA pode divulgar um benefício ou parceria da unidade? ✅
 Mande o material completo e a gente inclui no conhecimento da IA: ela passa a
-explicar o benefício quando o cliente perguntar. O envio ativo para a base de
-clientes a gente avalia com vocês.
+explicar o benefício quando o cliente perguntar. O envio ativo desse tipo de
+mensagem costuma ser classificado pela Meta como Marketing, que é mais caro; a
+gente pode testar com uma amostra.
 
 ### Podemos ajustar o que a IA fala? ✅
 Sim. Mande aqui um print do que soou diferente do que vocês praticam (preço,
@@ -503,7 +479,7 @@ regra, jeito de falar) e a gente ajusta. Quanto mais material da unidade vocês
 mandarem (especialidades, regras, o que fazer quando não tem uma especialidade),
 mais completa a IA fica.
 
-### Dá para reduzir a quantidade de mensagens? ⛔
+### Dá para reduzir a quantidade de mensagens? ⚠️
 A gente pode testar, mas a tendência é o resultado cair. Pedido de mudança de
 estratégia vai para a equipe, então o agente escala.
 
@@ -554,12 +530,9 @@ tráfego.
 
 ---
 
-## 11. Campanha Desenrola 7Bee (~11) ⛔
+## 11. Campanha Desenrola 7Bee (~11)
 
-> É uma campanha de cobrança com desconto, então tudo escala. O texto fica só
-> como referência para a equipe.
-
-### Como funciona ⛔
+### Como funciona ✅
 É uma ação pontual de 3 dias, no fim do mês, para recuperar a inadimplência mais
 antiga:
 
@@ -580,8 +553,7 @@ edição. Pedido para mudar valores ou condições é ⚠️ e vai para a equipe
 
 | Regra | Exemplos que apareceram |
 | --- | --- |
-| Cobrança | tudo da cobrança feita pela IA: réguas, disparos aos inadimplentes, pagamentos, baixas, reembolso, descontos, Campanha Desenrola, gateway |
-| Valores | qualquer valor ou custo: mensalidade e repasse da 7Bee, fechamento mensal, custos da OpenAI e da Meta, preço de número, valores de campanha |
+| Valores da 7Bee | pergunta sobre a mensalidade ou repasse da 7Bee e sobre o fechamento mensal |
 | Contrato | o que acontece se a solução parar de funcionar; prazo e adendo depois dos 60 dias |
 | Cancelamento | a unidade quer cancelar ou pausar o serviço |
 | Reclamação | resultado abaixo do esperado; excesso de mensagens gerando desfiliação; IA cobrando quem já tinha negociado com a equipe |
@@ -615,9 +587,10 @@ usar.
 
 ## Pontos para o Guilherme confirmar
 
-- **Os itens ❓ deste documento:** a rotina das planilhas, o envio de
-  documentos e contrato, o período de teste, a verificação facial do gateway e o
-  acesso ao CTN. São "relacionados a cobrança ou contrato"?
+- **Números de terceiros.** O histórico cita a Salvy (cerca de R$ 29,90 por
+  mês, por número) como opção de número virtual. Os valores de OpenAI e Meta
+  também aparecem (US$ 15, US$ 10, US$ 15 a 50 por mês). Nenhum desses é valor
+  da 7Bee. O agente pode citá-los?
 - **Gateway obrigatório?** No começo do histórico, a aprovação da AbacatePay era
   pré-requisito para começar. Com o acesso ao CTN, ela passou a ser
   complementar. Confirmar a regra atual.
