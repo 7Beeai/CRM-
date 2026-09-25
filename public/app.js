@@ -341,7 +341,41 @@ function messageCard(m) {
   </article>`;
 }
 
+const quando = (s) => `pausado em ${doBanco(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+
+// Grupos em que o agente parou porque a franquia percebeu que é robô.
+async function renderPausas() {
+  const caixa = $('#pausas-notice');
+  let lista = [];
+  try { lista = await apiCall('/agent/pausas'); } catch { /* sem pausas, sem aviso */ }
+  if (!lista.length) { caixa.hidden = true; caixa.innerHTML = ''; return; }
+  caixa.hidden = false;
+  caixa.innerHTML = `
+    <div class="sb-notice sb-notice--danger" role="alert">
+      <span><b>Agente pausado em ${lista.length} ${lista.length === 1 ? 'grupo' : 'grupos'}.</b>
+        A franquia percebeu que estava falando com um robô. Ele volta sozinho quando você escrever no grupo.</span>
+      ${lista.map((p) => `
+        <div class="sb-notice__row">
+          <span class="sb-notice__grupo"><b>${esc(p.franchise_name || p.group_name)}</b>${p.trecho ? ` · “${esc(p.trecho.slice(0, 90))}${p.trecho.length > 90 ? '…' : ''}”` : ''}
+            <small> · ${esc(quando(p.pausado_em))}</small></span>
+          ${p.whatsapp_group_link ? `<a class="sb-btn sb-btn--sm" href="${esc(p.whatsapp_group_link)}" target="_blank" rel="noopener noreferrer">${ICON.group}Abrir grupo</a>` : ''}
+          <button class="sb-btn sb-btn--sm" type="button" data-retomar="${esc(p.group_id)}">Reativar agente</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+$('#pausas-notice').addEventListener('click', async (e) => {
+  const id = e.target.closest('[data-retomar]')?.dataset.retomar;
+  if (!id) return;
+  try {
+    await apiCall('/agent/pausas/retomar', { method: 'POST', body: { group_id: id, actor: 'guilherme' } });
+    toast('Agente reativado neste grupo.');
+    await renderPausas();
+  } catch (err) { toast(err.message); }
+});
+
 async function renderMessages() {
+  renderPausas();
   const params = comPeriodo(new URLSearchParams(
     Object.entries({ ...state.msgFilters, ...FILAS[state.fila] }).filter(([, v]) => v)
   ));
@@ -570,6 +604,7 @@ function onbCard(o) {
   const tags = [];
   if (o.origem === 'whatsapp') tags.push('<span class="sb-badge sb-badge--info">Veio do WhatsApp</span>');
   if (o.bloqueada) tags.push('<span class="sb-badge sb-badge--danger">Tarefa travada</span>');
+  if (o.agente_pausado) tags.push('<span class="sb-badge sb-badge--danger">Agente pausado</span>');
   if (o.parada) tags.push(`<span class="sb-badge sb-badge--honey">Parada há ${o.dias_na_etapa}d</span>`);
   const prazo = seloDoPrazo(o.prazo);
   if (prazo) tags.unshift(prazo);

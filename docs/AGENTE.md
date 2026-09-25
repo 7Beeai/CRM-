@@ -50,8 +50,14 @@ motivo, e não manda nada no grupo.
 **Como se apresenta**
 
 - Assina como Guilherme, no número do Guilherme.
-- Ponto em aberto: o que responder se a franquia perguntar diretamente se está
-  falando com um robô.
+- **Se a franquia perceber que é robô**, o agente não responde e para naquele
+  grupo. Vale quando a franquia pergunta se é robô, IA ou resposta automática,
+  ou dá qualquer sinal de que percebeu. Nesse caso:
+  - o Guilherme recebe um alerta: a mensagem entra com prioridade alta em
+    **Precisam de você**, a Triagem mostra um aviso vermelho e o webhook de
+    alerta é avisado;
+  - o agente fica pausado **só naquele grupo** até o Guilherme escrever lá. Ele
+    também pode reativar pelo botão **Reativar agente** na Triagem.
 
 **Quem é da equipe 7Bee**
 
@@ -198,6 +204,21 @@ tocar no Slack ou no WhatsApp do CS. Basta definir a variável
   "rascunho_sugerido": "Oi Mariana, o time já está olhando."
 }
 ```
+
+## Pausa do agente por grupo
+
+Rotas usadas pelo fluxo do n8n. Todas exigem o token (`x-crm-token`).
+
+| Método e rota | Para quê |
+| --- | --- |
+| `GET /api/agent/contexto?group_id=` | antes de responder: franquia, etapa, tarefas pendentes e se o grupo está pausado |
+| `POST /api/agent/pausa` | a franquia percebeu que é robô: pausa o grupo, cria o alerta e avisa o webhook (`tipo: "agente_pausado"`) |
+| `GET /api/agent/pausa?group_id=` | o grupo está pausado? |
+| `POST /api/agent/envio` | registra o id de cada mensagem que o agente enviou |
+| `POST /api/agent/mensagem-do-guilherme` | uma mensagem do número do Guilherme apareceu no grupo; se não foi o agente que enviou, a pausa acaba |
+
+A tela do CRM usa `GET /api/agent/pausas` e `POST /api/agent/pausas/retomar`.
+O desenho completo do fluxo está em [`agente/FLUXO-N8N.md`](agente/FLUXO-N8N.md).
 
 ## Segurança
 

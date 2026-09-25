@@ -6,6 +6,7 @@ import * as api from './api.js';
 import * as onb from './onboarding.js';
 import * as baileys from './whatsapp.js';
 import * as evolution from './evolution.js';
+import * as pausas from './pausas.js';
 
 // Com a Evolution configurada, a tela do WhatsApp lê da instância dela; sem ela, usa o QR code.
 const whats = evolution.configurado ? evolution : baileys;
@@ -81,6 +82,25 @@ const server = createServer(async (req, res) => {
 
   try {
     const idMatch = pathname.match(/^\/api\/(messages|contacts)\/(\d+)(\/[a-z]+)?$/);
+
+    // Pausa do agente por grupo (a franquia percebeu que é robô).
+    if (pathname.startsWith('/api/agent/')) {
+      const acao = pathname.slice('/api/agent/'.length);
+      // Tela do CRM: ver e reativar.
+      if (acao === 'pausas' && req.method === 'GET') return send(res, 200, pausas.listarPausas());
+      if (acao === 'pausas/retomar' && req.method === 'POST') {
+        const body = await readJson(req);
+        return send(res, 200, pausas.retomar(body.group_id, { por: body.actor ?? 'Guilherme' }));
+      }
+      // Fluxo do agente (n8n): protegido pelo token.
+      const doFluxo = ['pausa', 'envio', 'mensagem-do-guilherme', 'contexto'];
+      if (doFluxo.includes(acao) && !webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
+      if (acao === 'contexto' && req.method === 'GET') return send(res, 200, pausas.contextoDoGrupo(q.group_id));
+      if (acao === 'pausa' && req.method === 'GET') return send(res, 200, pausas.pausaDoGrupo(q.group_id));
+      if (acao === 'pausa' && req.method === 'POST') return send(res, 200, pausas.pausar(await readJson(req)));
+      if (acao === 'envio' && req.method === 'POST') return send(res, 200, pausas.registrarEnvio(await readJson(req)));
+      if (acao === 'mensagem-do-guilherme' && req.method === 'POST') return send(res, 200, pausas.mensagemDoGuilherme(await readJson(req)));
+    }
 
     // Fila do agente: mensagens que ainda esperam uma decisão.
     if (pathname === '/api/agent/queue' && req.method === 'GET') {

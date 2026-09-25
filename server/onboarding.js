@@ -145,8 +145,19 @@ function decorate(row) {
     dias_desde_o_inicio: Math.floor((Date.now() - parse(row.started_at)) / 8.64e7),
     dias_na_etapa: diasNaEtapa,
     parada: row.stage !== 'concluido' && row.situacao === 'ativo' && diasNaEtapa >= PARADO_DIAS,
-    prazo: situacaoDoPrazo(row)
+    prazo: situacaoDoPrazo(row),
+    agente_pausado: agentePausado(row.whatsapp_group_id)
   };
+}
+
+// A tabela de pausas nasce em pausas.js; aqui só se consulta.
+function agentePausado(groupId) {
+  if (!groupId) return false;
+  try {
+    return Boolean(db.prepare(`SELECT 1 FROM agent_pausas WHERE group_id = ?`).get(groupId));
+  } catch {
+    return false;
+  }
 }
 
 export function listOnboardings({ q = '', stage = '', situacao = 'ativo', desde = '', ate = '' } = {}) {

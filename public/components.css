@@ -195,6 +195,11 @@ select.sb-field { appearance: none; padding-right: 32px; background-image: linea
 .sb-notice { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--honey-soft); color: var(--ink); font: 500 13px/20px var(--font-sans); box-shadow: inset 3px 0 0 var(--honey); }
 .sb-notice b { color: var(--honey-text); }
 .sb-notice .sb-btn { margin-left: auto; }
+.sb-notice--danger { background: var(--danger-soft); box-shadow: inset 3px 0 0 var(--danger); display: grid; gap: var(--space-2); }
+.sb-notice--danger b { color: var(--danger); }
+.sb-notice__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.sb-notice__row .sb-btn { margin-left: 0; }
+.sb-notice__row .sb-notice__grupo { flex: 1; min-width: 180px; }
 
 @media (prefers-reduced-motion: reduce) {
   .sb-bee, .sb-stat--attention::after { animation: none; }
