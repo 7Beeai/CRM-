@@ -49,10 +49,17 @@ motivo, e não manda nada no grupo.
 - Ponto em aberto: o que responder se a franquia perguntar diretamente se está
   falando com um robô.
 
+**Quem é da equipe 7Bee**
+
+O agente reconhece a equipe pelo número de quem escreve. A lista de números fica
+na configuração do fluxo no n8n, não no Git. Ainda falta confirmar o nome de
+dois números que aparecem em quase todos os grupos falando pela 7Bee.
+
 **O que ele sabe**
 
-- A base de conhecimento vem das respostas que o Guilherme e o Victor, que fazia
-  a função antes, já deram nos grupos CDT.
+- A base de conhecimento, em
+  [`docs/agente/base-de-conhecimento.md`](agente/base-de-conhecimento.md), vem
+  das respostas que a equipe (Guilherme, Victor e os demais) deu nos grupos CDT.
 - O Guilherme revisa a base antes de o agente entrar no ar.
 
 ## As três decisões possíveis
