@@ -1,14 +1,14 @@
 # Base de conhecimento do agente — grupos CDT
 
-> **Rascunho para revisão do Guilherme.** Montado a partir de 3.603 mensagens dos
+> **Revisado pelo Guilherme em 28/09/2026.** Montado a partir de 3.603 mensagens dos
 > 33 grupos CDT, de 20/07 a 25/09/2026, com as respostas que o Guilherme, o Victor
 > e o restante da equipe 7Bee deram às franquias. Nenhum nome, telefone, e-mail,
 > login ou senha foi copiado. O que é específico de cada unidade aparece entre
 > chaves, por exemplo `{link do dashboard}`.
 >
-> Como revisar: corrija as respostas, apague o que não vale mais e preencha as
-> lacunas da seção [O que falta responder](#o-que-falta-responder). Depois de
-> revisado, este arquivo vira o conhecimento do agente no n8n.
+> Na revisão, o Guilherme confirmou 58 respostas, passou 13 itens para ele
+> mesmo responder (⛔) e corrigiu o perfil de acesso ao CTN. Este arquivo vira
+> o conhecimento do agente no n8n: só os itens ✅ e ⚠️ entram.
 
 ## Legenda
 
@@ -103,7 +103,7 @@ a sincronização. Para dividir o trabalho:
 - a equipe trabalha da régua 2 em diante;
 - a gente configura a IA para cobrar só NR e R1.
 
-### Subi e não sincronizou ⚠️
+### Subi e não sincronizou ⛔
 Confira se o relatório certo está na pasta certa e em XLSX. Se estiver, avise
 aqui que a gente força a sincronização. Neste caso, o agente escala.
 
@@ -132,7 +132,7 @@ A gente combina um horário com a unidade. Nesse horário, alguém precisa estar
 **com o chip em mãos**. Enviamos um código por SMS (ou por ligação) e vocês nos
 passam o código aqui no grupo. Ele expira rápido.
 
-### O código não chegou ⚠️
+### O código não chegou ⛔
 - Confira se o número está certo.
 - Chip novo precisa estar ativado, com recarga.
 - Se a Meta acusar limite de envios, ela trava por um tempo: tentamos de novo
@@ -140,7 +140,7 @@ passam o código aqui no grupo. Ele expira rápido.
 - Se for linha virtual e o código não aparecer, acione o suporte do provedor.
 - Reenviar o código é com a equipe, então o agente escala.
 
-### Trocar um número já cadastrado ⚠️
+### Trocar um número já cadastrado ⛔
 A equipe retira o número antigo e cadastra o novo com um código. Para isso, é
 preciso alguém com o chip novo em mãos. O agente escala.
 
@@ -148,7 +148,7 @@ preciso alguém com o chip novo em mãos. O agente escala.
 
 ## 3. OpenAI: conta, cartão e custo (~26)
 
-### Para que serve e como é criada ✅
+### Para que serve e como é criada ⛔
 É a conta da **plataforma de API da OpenAI**, que paga os "pensamentos" da IA.
 **A assinatura do ChatGPT não serve**: é outra conta.
 
@@ -160,7 +160,7 @@ Como criar:
 - Avisem quando puderem receber o código, porque ele expira rápido. Confiram
   também o spam.
 
-### Como cadastrar o cartão ✅
+### Como cadastrar o cartão ⛔
 1. Entre com o e-mail da conta.
 2. Acesse `{link de billing da OpenAI}` e clique em "adicionar detalhes de
    pagamento".
@@ -181,14 +181,13 @@ pela Meta.
 - **OpenAI**, pré-pago: paga os tokens da IA.
 - **Meta**, pós-pago: paga as mensagens de disparo.
 
-São duas cobranças separadas, direto no cartão da unidade. Nenhuma das duas é a
-mensalidade da 7Bee. Pergunta sobre valores da 7Bee é ⛔.
+São duas cobranças separadas, direto no cartão da unidade.
 
 ---
 
 ## 4. Meta: cartão dos disparos, BM e limites (~45)
 
-### Como cadastrar o cartão na Meta ✅
+### Como cadastrar o cartão na Meta ⛔
 É a **última etapa da parte de vocês** antes de começar.
 
 1. Abra `{link da central de cobrança da Meta}` num navegador em que o BM já
@@ -279,7 +278,7 @@ e-mail.
 - O próprio link mostra o que ainda falta.
 - Não recebeu o e-mail do contrato? Olhe o spam. A gente também pode reenviar.
 
-### Falta alguma coisa? Quando começa? ⚠️
+### Falta alguma coisa? Quando começa? ⛔
 Resposta geral: quando tudo estiver concluído, a gente começa em até 48 horas.
 Muitas vezes começa no dia seguinte, e no mesmo dia se a lista subir cedo.
 
@@ -293,7 +292,7 @@ esteira a unidade está e responder de forma exata.
 No primeiro dia em que os disparos começarem. A foto do grupo é trocada para
 marcar esse início.
 
-### Podemos fazer uma reunião? ⚠️
+### Podemos fazer uma reunião? ⛔
 Sim. A gente recomenda que a reunião seja no dia do início, ou depois dele, para
 já ter dados reais. O horário é combinado com a equipe, então o agente escala.
 
@@ -333,12 +332,12 @@ erro, recarregue com Ctrl+Shift+R ou use uma janela anônima.
 
 ## 7. CTN, baixas e formas de pagamento (~32)
 
-### Para que serve o acesso ao CTN (Gerente do Cartão)? ✅
+### Para que serve o acesso ao CTN (perfil Secretaria)? ✅
 É por esse acesso que a IA gera, na hora, o link de conciliação de cada cliente
 e dá as baixas automáticas.
 
-Como criar: um usuário **Operador de Adimplência** com o perfil **GERENTE DO
-CARTÃO**. Selecione o perfil e clique em Gravar. O CPF a usar é informado pela
+Como criar: um usuário **Operador de Adimplência** com o perfil
+**SECRETARIA**. Selecione o perfil e clique em Gravar. O CPF a usar é informado pela
 equipe.
 
 ### Como o cliente paga? ✅
@@ -361,7 +360,7 @@ Sim. Ela cobra o que está na lista de inadimplentes do BI. Cobra todas as
 parcelas que o CTN libera; parcelas que ainda estão no motor de recorrência
 entram depois, automaticamente.
 
-### Cliente em dia recebendo cobrança / pagou e não teve baixa ⚠️
+### Cliente em dia recebendo cobrança / pagou e não teve baixa ⛔
 A IA segue a lista do BI. Coisas para conferir:
 
 - se o cliente estava na lista do dia;
@@ -371,7 +370,7 @@ A IA segue a lista do BI. Coisas para conferir:
 
 O agente pede a **matrícula** e escala.
 
-### Excluir um cliente da cobrança ⚠️
+### Excluir um cliente da cobrança ⛔
 O agente pede a matrícula e escala. A exclusão é feita pela equipe.
 
 ### Reembolso, estorno, pagamento duplicado ⛔
@@ -396,7 +395,7 @@ O mesmo login dá acesso à área de Vendas do Chat.
 O agente **nunca** envia login nem senha. Ele pede os e-mails e escala para a
 equipe criar os acessos.
 
-### Trocar ou desativar o acesso de alguém que saiu ⚠️
+### Trocar ou desativar o acesso de alguém que saiu ⛔
 O agente pede o e-mail a desativar, o e-mail novo e se o acesso é para o
 Dashboard, o Chat ou os dois. Depois escala.
 
