@@ -44,6 +44,9 @@ Evolution (Guilherme-7Bee) ──webhook MESSAGES_UPSERT──▶ n8n
    do n8n (`EQUIPE_7BEE`). O número do Guilherme é o da própria instância.
 5. **Aviso ao Guilherme:** defina `CRM_ESCALATION_WEBHOOK` no CRM apontando para
    um segundo fluxo do n8n (ver [Alertas](#alertas)).
+6. **Dados que a base cita entre chaves:** o CPF do operador da 7Bee no CTN
+   fica na variável `CPF_OPERADOR_CTN`. Ao montar o prompt do passo 9, troque
+   `{CPF do operador da 7Bee}` por ela. Esse dado não vai para o Git.
 
 ## Os passos em detalhe
 

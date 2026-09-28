@@ -90,10 +90,12 @@ no resultado do dia.
 - Nos dias de disparo sem lista nova, a IA usa a do dia anterior, tirando quem
   já pagou.
 - **Aos domingos não há disparos.**
-- Aos sábados, subir a lista não é obrigatório, mas com a lista atualizada o
-  resultado é melhor.
-- Nos feriados, a estratégia é reduzida.
+- **Aos sábados há cobrança**, mas subir a lista não é obrigatório. Sem lista
+  nova, a IA usa a do dia anterior.
 - Avise os feriados municipais com antecedência.
+
+Ainda não há regra definida para os feriados. Se perguntarem como funciona num
+feriado, o agente escala para o Guilherme.
 
 ### Podemos tirar clientes ou colunas para dividir a cobrança com a equipe? ✅
 Mantenha a lista completa, no formato do BI. Remover colunas ou clientes quebra
@@ -298,35 +300,17 @@ já ter dados reais. O horário é combinado com a equipe, então o agente escal
 
 ---
 
-## 6. Gateway de pagamento (AbacatePay) (~21)
+## 6. Gateway de pagamento (AbacatePay) — não é mais usado
 
-### Quem faz a verificação facial (KYC)? ✅
-**Basta um sócio**, quem conseguir fazer mais rápido, pelo `{link de
-verificação}`.
+A 7Bee não usa mais o gateway da AbacatePay. Hoje o pagamento é todo pelo link
+de conciliação do CTN.
 
-- Pode ser um procurador, desde que envie o documento e uma procuração que dê
-  direito de abrir contas.
-- Se no final o botão "avançar" não habilitar, é assim mesmo: a gente repassa
-  para o gateway.
-- Se o gov.br bloquear a abertura de contas no seu nome, desative essa
-  configuração no gov.br.
-- Às vezes o gateway pede um segundo sócio. Quando pedir, a gente avisa.
+### Precisa fazer a verificação facial / abrir conta na AbacatePay? ✅
+Não precisa mais. Hoje o pagamento dos clientes é todo pelo link de conciliação
+do CTN, que já cai conciliado.
 
-### Para que serve a conta no gateway? ✅
-- É uma conta de recebimento **complementar**. O pagamento principal é pelo link
-  de conciliação do CTN, que já cai conciliado.
-- Os valores que entram pelo gateway (baixados no CTN como "DIRETO NO CARTÃO -
-  CEF") ficam nessa conta.
-- Para retirar esses valores, é preciso fazer saques periodicamente.
-
-### Não consigo sacar / o código não chega no e-mail ✅
-O código de saque vem de um **aplicativo autenticador**, não do e-mail. Se ainda
-não cadastraram o autenticador, é preciso cadastrar. Se outra pessoa já
-cadastrou, peçam o código a ela.
-
-### Entrei e não aparece valor ✅
-Provavelmente a conta está no modo teste: clique em "Ir para produção". Se der
-erro, recarregue com Ctrl+Shift+R ou use uma janela anônima.
+### Conta, saques ou valores na AbacatePay (unidades antigas) ⛔
+Escala para o Guilherme.
 
 ---
 
@@ -337,8 +321,14 @@ erro, recarregue com Ctrl+Shift+R ou use uma janela anônima.
 e dá as baixas automáticas.
 
 Como criar: um usuário **Operador de Adimplência** com o perfil
-**SECRETARIA**. Selecione o perfil e clique em Gravar. O CPF a usar é informado pela
-equipe.
+**SECRETARIA**, no CPF `{CPF do operador da 7Bee}`. Selecione o perfil e clique
+em Gravar.
+
+### Qual CPF cadastrar no acesso ao CTN? ✅
+O do operador da 7Bee: `{CPF do operador da 7Bee}`.
+
+No n8n, esse valor vem da variável `CPF_OPERADOR_CTN`. Ele não fica escrito
+neste arquivo.
 
 ### Como o cliente paga? ✅
 - Pelo link de conciliação da franqueadora, com cartão ou PIX. O pagamento cai
@@ -350,7 +340,10 @@ equipe.
 - Dá para tirar o PIX do link, mas pela nossa experiência o resultado cai
   bastante.
 
-### Qual forma de pagamento a IA usa na baixa manual? ✅
+### Qual forma de pagamento a IA usa na baixa manual? ⛔
+> A resposta abaixo citava o gateway, que não é mais usado. Até o Guilherme
+> atualizar, ele mesmo responde.
+
 "DIRETO NO CARTÃO - CEF". Isso só acontece quando o link de conciliação falha e
 o cliente paga pelo caminho antigo, e o dinheiro fica no gateway. A unidade pode
 escolher outra forma de lançamento: é só avisar.
@@ -478,6 +471,12 @@ regra, jeito de falar) e a gente ajusta. Quanto mais material da unidade vocês
 mandarem (especialidades, regras, o que fazer quando não tem uma especialidade),
 mais completa a IA fica.
 
+### O tom do chat está pessoal demais. Dá para mudar? ✅
+Sim, podemos alterar. Como você sugere que seja o tom?
+
+### A IA pode informar que a unidade tem especialidades em outros locais? ✅
+Sim. Em quais locais vocês têm especialidades?
+
 ### Dá para reduzir a quantidade de mensagens? ⚠️
 A gente pode testar, mas a tendência é o resultado cair. Pedido de mudança de
 estratégia vai para a equipe, então o agente escala.
@@ -556,45 +555,36 @@ edição. Pedido para mudar valores ou condições é ⚠️ e vai para a equipe
 | Contrato | o que acontece se a solução parar de funcionar; prazo e adendo depois dos 60 dias |
 | Cancelamento | a unidade quer cancelar ou pausar o serviço |
 | Reclamação | resultado abaixo do esperado; excesso de mensagens gerando desfiliação; IA cobrando quem já tinha negociado com a equipe |
-| Problema técnico | pagamento sem baixa; reembolso ou estorno; conversa marcada como cancelamento sem pedido; erro ou lentidão no Dashboard, no Chat ou no gateway; template com texto estranho |
+| Problema técnico | pagamento sem baixa; reembolso ou estorno; conversa marcada como cancelamento sem pedido; erro ou lentidão no Dashboard ou no Chat; template com texto estranho |
 
 Quando escala, o agente não escreve nada no grupo. Ele registra no CRM com o
 motivo, e a mensagem aparece para o Guilherme em **Precisam de você**.
 
 ---
 
-## O que falta responder
+## Perguntas sem resposta retiradas
 
-Estas perguntas apareceram nos grupos sem resposta em texto: foram respondidas
-em áudio ou ficaram sem retorno. O Guilherme precisa completar antes de o agente
-usar.
+O Guilherme retirou estas perguntas da base. Se aparecerem num grupo, o agente
+escala:
 
-1. A própria unidade consegue enviar um template para reabrir a conversa depois
-   de 24h? Onde fica isso no Chat?
-2. O tom do chat está pessoal demais em algumas mensagens. Dá para mudar?
-3. A IA pode informar que a unidade tem especialidades em outros locais?
-4. Clientes que combinaram uma data de pagamento continuam recebendo disparos
-   ou vão para o time?
-5. Qual CPF deve ser cadastrado no acesso ao CTN?
-6. Os pagamentos recebidos pela IA caem em qual instituição? Quem da unidade
-   pode fazer os saques? Dá para usar o mesmo e-mail em outra unidade?
-7. Sócios que saíram do quadro societário: o documento enviado considerou isso?
-8. Leads do Agente de Vendas chegam, mas não fecham. O que fazer?
-9. Como funciona, no dia a dia, o Agente de Vendas junto com o tráfego pago?
-10. Dá para trocar o link de filiação usado pelo Agente de Vendas?
-11. A unidade não quer dar acesso ao Power BI. Qual é a alternativa?
+- Se a própria unidade consegue enviar um template para reabrir a conversa
+  depois de 24h.
+- Se os clientes que combinaram uma data de pagamento continuam recebendo
+  disparos.
+- Em qual instituição caem os pagamentos, quem faz os saques e se o mesmo
+  e-mail serve para outra unidade.
+- Sócios que saíram do quadro societário.
+- Leads do Agente de Vendas que chegam, mas não fecham.
+- Como o Agente de Vendas funciona com o tráfego pago no dia a dia.
+- Troca do link de filiação do Agente de Vendas.
+- Unidade que não quer dar acesso ao Power BI.
 
-## Pontos para o Guilherme confirmar
+## Decisões do Guilherme (28/09/2026)
 
-- **Números de terceiros.** O histórico cita a Salvy (cerca de R$ 29,90 por
-  mês, por número) como opção de número virtual. Os valores de OpenAI e Meta
-  também aparecem (US$ 15, US$ 10, US$ 15 a 50 por mês). Nenhum desses é valor
-  da 7Bee. O agente pode citá-los?
-- **Gateway obrigatório?** No começo do histórico, a aprovação da AbacatePay era
-  pré-requisito para começar. Com o acesso ao CTN, ela passou a ser
-  complementar. Confirmar a regra atual.
-- **Limite de disparos.** 250 por dia com o BM em análise e cerca de 2 mil
-  depois. Ainda vale?
-- **Sábados.** Uma resposta diz que a lista de sábado não é obrigatória e outra
-  que há cobrança no dia. Confirmar.
-- **Feriados.** "Estratégia reduzida, em teste". Já existe uma regra definida?
+| Ponto | Decisão |
+| --- | --- |
+| Valores de terceiros (OpenAI, Meta, número virtual) | O agente pode citar. |
+| Gateway (AbacatePay) | Não é mais usado. |
+| Limite de disparos | Continua valendo: 250 por dia com o BM em análise, cerca de 2 mil depois. |
+| Sábados | Há cobrança, mas não é obrigatório subir a lista. |
+| Feriados | Ainda não há regra definida: o agente escala. |
