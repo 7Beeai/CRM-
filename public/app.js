@@ -622,7 +622,7 @@ function onbCard(o) {
         : ''}
     </div>
     <div class="onb__meta">
-      ${esc(o.plan || 'sem plano informado')} · há ${o.dias_desde_o_inicio}d${o.owner ? ` · ${esc(o.owner)}` : ''}
+      ${o.plan ? `${esc(o.plan)} · ` : ''}há ${o.dias_desde_o_inicio}d${o.owner ? ` · ${esc(o.owner)}` : ''}
     </div>
     ${tags.length ? `<div class="onb__tags">${tags.join('')}</div>` : ''}
     <div class="progress" title="${o.tarefas_feitas} de ${o.total_tarefas} tarefas">
