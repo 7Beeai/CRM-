@@ -250,11 +250,54 @@ No CRM, o grupo pausado aparece em vermelho no topo da Triagem, com os botões
 3. **Ajuste contínuo.** Cada "resposta ruim" marcada no CRM vira correção na
    base de conhecimento.
 
-## Pendências para montar
+## Onde está no n8n
 
-- A revisão da base pelo Guilherme (planilha `revisao-base-de-conhecimento.xlsx`).
-- O CRM hospedado num endereço que o n8n alcance.
-- Qual modelo de IA usar no nó do passo 9: o mesmo que vocês já usam nos outros
-  fluxos.
-- O número pessoal do Guilherme para os alertas, cadastrado como variável no
-  n8n.
+Em 28/09/2026 foram criados dois fluxos, os dois **desligados**:
+
+| Fluxo | O que faz |
+| --- | --- |
+| **Agente CS — grupos CDT (7Bee)** | todo o desenho acima, em 22 nós |
+| **Alertas do CRM → WhatsApp do Guilherme (7Bee)** | recebe o `CRM_ESCALATION_WEBHOOK` e avisa o Guilherme pela instância `Victor - 7Bee` |
+
+As URLs dos webhooks têm um trecho aleatório, que serve como senha. Elas ficam
+no n8n, não aqui.
+
+### Configuração
+
+A configuração fica no primeiro nó de código de cada fluxo:
+
+- **Agente, nó "Ler mensagem":**
+  - `CRM_URL`;
+  - `MODO` (`sugestao` ou `automatico`);
+  - `ESPERA_SEG`;
+  - `CONFIANCA_MIN`;
+  - `MODELO` (`gpt-4.1-mini`, o mesmo dos outros fluxos);
+  - os identificadores da equipe;
+  - o CPF do operador do CTN.
+- **Alertas, nó "Montar aviso":**
+  - o número pessoal do Guilherme;
+  - se todo escalonamento deve gerar aviso ou só os de prioridade alta e as
+    pausas.
+
+A base de conhecimento vai dentro do nó **Base de conhecimento**. Quando a base
+mudar, troque o texto desse nó pela versão nova (itens ✅ e ⚠️).
+
+### Credenciais
+
+As credenciais ficam em branco para escolher no n8n:
+
+- **CRM 7Bee (token):** Header Auth, nome `x-crm-token`.
+- **Evolution (apikey):** Header Auth, nome `apikey`.
+- **OpenAI:** uma credencial **da 7Bee**. As credenciais de OpenAI que já
+  existem no n8n são das franquias e não servem aqui.
+
+## Pendências para ligar
+
+1. CRM hospedado num endereço que o n8n alcance, com `CRM_TOKEN` definido.
+2. `CRM_URL` preenchido e as três credenciais escolhidas nos nós.
+3. Número pessoal do Guilherme no fluxo de alertas.
+4. Ativar os dois fluxos. Depois, configurar na Evolution o webhook da
+   instância `Guilherme-7Bee`: evento `MESSAGES_UPSERT`, URL de produção do nó
+   **Webhook Evolution**.
+5. Rodar em `MODO = sugestao` por 2 a 3 semanas antes de trocar para
+   `automatico`.

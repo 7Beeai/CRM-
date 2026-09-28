@@ -67,10 +67,11 @@ já respondeu à pergunta, ele fica em silêncio:
 | Pessoa | Como aparece nos grupos |
 | --- | --- |
 | Guilherme | o próprio número da instância `Guilherme-7Bee`; o agente responde por ele |
-| Victor | número pessoal, apresentado nos grupos como diretor operacional, e o número da instância `Victor - 7Bee` |
-| André | dois números: um que abre os grupos de onboarding e outro com o nome dele no perfil |
+| Victor | um número, o mesmo da instância `Victor - 7Bee`; nos grupos aparece também como um código interno do WhatsApp |
+| André | um número; nos grupos aparece também como um código interno do WhatsApp |
 
-Os números completos ficam na configuração do fluxo no n8n, não no Git.
+O telefone e o código interno de cada um ficam na configuração do fluxo no n8n,
+não no Git.
 
 **O que ele sabe**
 
