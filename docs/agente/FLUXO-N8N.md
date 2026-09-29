@@ -286,15 +286,17 @@ mudar, troque o texto desse nó pela versão nova (itens ✅ e ⚠️).
 
 As credenciais ficam em branco para escolher no n8n:
 
-- **CRM 7Bee (token):** Header Auth, nome `x-crm-token`.
+- **CRM 7Bee:** Custom Auth com dois cabeçalhos: `Authorization: Basic …`
+  (usuário e senha do nginx em crm.7bee.ai) e `x-crm-token` (o `CRM_TOKEN`). O
+  CRM fica atrás de senha no site inteiro, inclusive nas rotas que o n8n usa.
 - **Evolution (apikey):** Header Auth, nome `apikey`.
 - **OpenAI:** uma credencial **da 7Bee**. As credenciais de OpenAI que já
   existem no n8n são das franquias e não servem aqui.
 
 ## Pendências para ligar
 
-1. CRM hospedado num endereço que o n8n alcance, com `CRM_TOKEN` definido.
-2. `CRM_URL` preenchido e as três credenciais escolhidas nos nós.
+1. ~~CRM hospedado~~: no ar em https://crm.7bee.ai (29/09), atrás de senha. Confirmar que o `CRM_TOKEN` está definido no servidor.
+2. ~~`CRM_URL`~~ já preenchido. Falta escolher as três credenciais nos nós.
 3. Número pessoal do Guilherme no fluxo de alertas.
 4. Ativar os dois fluxos. Depois, configurar na Evolution o webhook da
    instância `Guilherme-7Bee`: evento `MESSAGES_UPSERT`, URL de produção do nó
