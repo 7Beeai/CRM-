@@ -22,6 +22,8 @@ const URL_BASE = (process.env.EVOLUTION_URL ?? '').replace(/\/+$/, '');
 const INSTANCIA = process.env.EVOLUTION_INSTANCE ?? '';
 const CHAVE = process.env.EVOLUTION_API_KEY ?? '';
 const INTERVALO_MIN = Number(process.env.CRM_EVOLUTION_INTERVALO_MIN ?? 5);
+// Tempo máximo para a Evolution listar os grupos. Com ~200 grupos na instância ela passa de 100 s.
+const TIMEOUT_GRUPOS_MS = Number(process.env.CRM_EVOLUTION_TIMEOUT_GRUPOS_S ?? 90) * 1000;
 const AJUSTE_LEITURA = 'evolution_ultima_leitura';
 
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
@@ -97,7 +99,7 @@ function guardarGrupo(g) {
 export async function lerGrupos() {
   if (estado.lendo) return estado.lendo;
   estado.lendo = (async () => {
-    const lista = await evo(`/group/fetchAllGroups/${inst}?getParticipants=false`, { timeout: 90000 });
+    const lista = await evo(`/group/fetchAllGroups/${inst}?getParticipants=false`, { timeout: TIMEOUT_GRUPOS_MS });
     if (!Array.isArray(lista)) throw bad('A Evolution devolveu a lista de grupos num formato inesperado.', 502);
 
     const conhecidos = new Set(grupos.keys());

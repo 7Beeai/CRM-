@@ -33,6 +33,7 @@ Variáveis de ambiente:
 | `CRM_ONBOARDING_PRAZO_DIAS` | meta de dias para concluir o onboarding | `5` |
 | `CRM_ONBOARDING_PRAZO_UTEIS` | `1` conta a meta em dias úteis | dias corridos |
 | `EVOLUTION_URL`, `EVOLUTION_INSTANCE`, `EVOLUTION_API_KEY` | lê o WhatsApp do CS pela Evolution API, ver [`docs/WHATSAPP.md`](docs/WHATSAPP.md) | vazio (usa QR code) |
+| `CRM_EVOLUTION_TIMEOUT_GRUPOS_S` | segundos de espera pela lista de grupos da Evolution (instância com muitos grupos passa de 100 s) | `90` |
 | `CRM_WHATSAPP_FILTRO` | só grupos com esse nome entram sozinhos na esteira, ex.: `CDT` | vazio (todos) |
 | `CRM_WHATSAPP_IGNORAR` | grupos que nunca viram franquia, ex.: `gest[aã]o` | vazio |
 
