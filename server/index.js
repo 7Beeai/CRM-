@@ -7,6 +7,7 @@ import * as onb from './onboarding.js';
 import * as baileys from './whatsapp.js';
 import * as evolution from './evolution.js';
 import * as pausas from './pausas.js';
+import * as auth from './auth.js';
 
 // Com a Evolution configurada, a tela do WhatsApp lê da instância dela; sem ela, usa o QR code.
 const whats = evolution.configurado ? evolution : baileys;
@@ -73,10 +74,38 @@ function webhookAuthorized(req) {
   return header === `Bearer ${TOKEN}` || req.headers['x-crm-token'] === TOKEN;
 }
 
+// O agente (n8n) entra pelo token mesmo com o login ligado. Sem CRM_TOKEN definido, não há atalho.
+function tokenValido(req, q) {
+  if (!TOKEN) return false;
+  return (req.headers.authorization ?? '') === `Bearer ${TOKEN}` || req.headers['x-crm-token'] === TOKEN || q.token === TOKEN;
+}
+
+// Arquivos que a tela de login precisa antes de a pessoa entrar.
+const LIVRES = new Set(['/login', '/login.html', '/tokens.css', '/components.css', '/api/login', '/api/logout', '/api/health']);
+const livre = (p) => LIVRES.has(p) || p.startsWith('/assets/');
+
+// Com login, quem registra a ação é quem está logado, não o que o navegador mandou.
+async function lerCorpo(req) {
+  const corpo = await readJson(req);
+  if (req.usuario && corpo && typeof corpo === 'object' && !Array.isArray(corpo)) corpo.actor = req.usuario.nome;
+  return corpo;
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
   const { pathname } = url;
   const q = Object.fromEntries(url.searchParams);
+
+  // Login: só vale quando existe pelo menos um usuário cadastrado.
+  if (auth.loginAtivo() && !livre(pathname)) {
+    req.usuario = auth.usuarioDaSessao(req);
+    if (!req.usuario && !tokenValido(req, q)) {
+      if (pathname.startsWith('/api/')) return send(res, 401, { error: 'Entre no CRM para continuar.', login: true });
+      res.writeHead(302, { location: '/login' }).end();
+      return;
+    }
+  }
+  if (pathname === '/login') return serveStatic(req, res, '/login.html');
 
   if (!pathname.startsWith('/api/')) return serveStatic(req, res, pathname);
 
@@ -89,7 +118,7 @@ const server = createServer(async (req, res) => {
       // Tela do CRM: ver e reativar.
       if (acao === 'pausas' && req.method === 'GET') return send(res, 200, pausas.listarPausas());
       if (acao === 'pausas/retomar' && req.method === 'POST') {
-        const body = await readJson(req);
+        const body = await lerCorpo(req);
         return send(res, 200, pausas.retomar(body.group_id, { por: body.actor ?? 'Guilherme' }));
       }
       // Fluxo do agente (n8n): protegido pelo token.
@@ -97,9 +126,9 @@ const server = createServer(async (req, res) => {
       if (doFluxo.includes(acao) && !webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
       if (acao === 'contexto' && req.method === 'GET') return send(res, 200, pausas.contextoDoGrupo(q.group_id));
       if (acao === 'pausa' && req.method === 'GET') return send(res, 200, pausas.pausaDoGrupo(q.group_id));
-      if (acao === 'pausa' && req.method === 'POST') return send(res, 200, pausas.pausar(await readJson(req)));
-      if (acao === 'envio' && req.method === 'POST') return send(res, 200, pausas.registrarEnvio(await readJson(req)));
-      if (acao === 'mensagem-do-guilherme' && req.method === 'POST') return send(res, 200, pausas.mensagemDoGuilherme(await readJson(req)));
+      if (acao === 'pausa' && req.method === 'POST') return send(res, 200, pausas.pausar(await lerCorpo(req)));
+      if (acao === 'envio' && req.method === 'POST') return send(res, 200, pausas.registrarEnvio(await lerCorpo(req)));
+      if (acao === 'mensagem-do-guilherme' && req.method === 'POST') return send(res, 200, pausas.mensagemDoGuilherme(await lerCorpo(req)));
     }
 
     // Fila do agente: mensagens que ainda esperam uma decisão.
@@ -109,6 +138,21 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/api/health') return send(res, 200, { ok: true });
+
+    if (pathname === '/api/login' && req.method === 'POST') {
+      const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
+      const { token, usuario } = auth.entrar(await readJson(req), ip);
+      res.setHeader('set-cookie', auth.cookieDeSessao(token, req));
+      return send(res, 200, { usuario });
+    }
+    if (pathname === '/api/logout' && req.method === 'POST') {
+      auth.sair(req);
+      res.setHeader('set-cookie', auth.cookieDeSaida());
+      return send(res, 200, { ok: true });
+    }
+    if (pathname === '/api/me' && req.method === 'GET') {
+      return send(res, 200, { login_ativo: auth.loginAtivo(), usuario: req.usuario ?? null });
+    }
     // Logo da abelha: o GIF animado tem prioridade; sem ele, vale a arte parada.
     if (pathname === '/api/marca' && req.method === 'GET') {
       const existe = (nome) => access(join(publicDir, 'assets', nome)).then(() => true, () => false);
@@ -123,13 +167,13 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/onboarding') {
       if (req.method === 'GET') return send(res, 200, onb.listOnboardings(q));
-      if (req.method === 'POST') return send(res, 201, onb.createOnboarding(await readJson(req)));
+      if (req.method === 'POST') return send(res, 201, onb.createOnboarding(await lerCorpo(req)));
     }
 
     // Entrada automática: um grupo novo no WhatsApp do CS vira um onboarding.
     if (pathname === '/api/onboarding/whatsapp-group' && req.method === 'POST') {
       if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
-      return send(res, 201, onb.fromWhatsappGroup(await readJson(req)));
+      return send(res, 201, onb.fromWhatsappGroup(await lerCorpo(req)));
     }
 
     // Conexão com o WhatsApp do CS: Evolution API ou leitura de QR code.
@@ -139,19 +183,19 @@ const server = createServer(async (req, res) => {
       if (acao === 'evolution-webhook' && req.method === 'POST') {
         if (!evolution.configurado) return send(res, 404, { error: 'A Evolution não está configurada.' });
         if (TOKEN && !webhookAuthorized(req) && q.token !== TOKEN) return send(res, 401, { error: 'Token inválido.' });
-        return send(res, 200, await evolution.receberEvento(await readJson(req)));
+        return send(res, 200, await evolution.receberEvento(await lerCorpo(req)));
       }
       if (acao === 'status' && req.method === 'GET') return send(res, 200, await whats.status());
       if (acao === 'conectar' && req.method === 'POST') return send(res, 200, await whats.conectar());
       if (acao === 'desconectar' && req.method === 'POST') return send(res, 200, await whats.desconectar());
       if (acao === 'grupos' && req.method === 'GET') return send(res, 200, whats.listarGrupos());
       if (acao === 'importar' && req.method === 'POST') {
-        const body = await readJson(req);
+        const body = await lerCorpo(req);
         return send(res, 200, await whats.importar(body.grupos));
       }
       if (acao === 'simular-leitura' && req.method === 'POST') return send(res, 200, await whats.simularLeitura());
       if (acao === 'simular-grupo-novo' && req.method === 'POST') {
-        const body = await readJson(req);
+        const body = await lerCorpo(req);
         return send(res, 200, await whats.simularGrupoNovo(body.nome ?? 'Grupo novo'));
       }
       return send(res, 404, { error: 'Rota não encontrada.' });
@@ -162,16 +206,16 @@ const server = createServer(async (req, res) => {
       const id = Number(onbMatch[1]);
       const sub = onbMatch[2];
       if (sub === 'stage' && req.method === 'POST') {
-        const body = await readJson(req);
+        const body = await lerCorpo(req);
         return send(res, 200, onb.moveStage(id, body.stage, { actor: body.actor ?? 'Guilherme' }));
       }
       if (sub === 'activities' && req.method === 'GET') return send(res, 200, onb.onboardingActivities(id));
       if (sub?.startsWith('tasks/') && req.method === 'PATCH') {
-        return send(res, 200, onb.setTask(id, sub.slice(6), await readJson(req)));
+        return send(res, 200, onb.setTask(id, sub.slice(6), await lerCorpo(req)));
       }
       if (!sub) {
         if (req.method === 'GET') return send(res, 200, onb.getOnboarding(id));
-        if (req.method === 'PATCH') return send(res, 200, onb.updateOnboarding(id, await readJson(req)));
+        if (req.method === 'PATCH') return send(res, 200, onb.updateOnboarding(id, await lerCorpo(req)));
         if (req.method === 'DELETE') return send(res, 200, onb.deleteOnboarding(id));
       }
     }
@@ -182,13 +226,13 @@ const server = createServer(async (req, res) => {
       if (req.method === 'GET') return send(res, 200, api.listMessages(q));
       if (req.method === 'POST') {
         if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
-        return send(res, 201, api.createMessage(await readJson(req)));
+        return send(res, 201, api.createMessage(await lerCorpo(req)));
       }
     }
 
     if (pathname === '/api/contacts') {
       if (req.method === 'GET') return send(res, 200, api.listContacts(q));
-      if (req.method === 'POST') return send(res, 201, api.createContact(await readJson(req)));
+      if (req.method === 'POST') return send(res, 201, api.createContact(await lerCorpo(req)));
     }
 
     if (idMatch) {
@@ -199,19 +243,19 @@ const server = createServer(async (req, res) => {
         if (sub === '/rescore' && req.method === 'POST') return send(res, 200, api.rescoreMessage(id));
         if (sub === '/agent' && req.method === 'POST') {
           if (!webhookAuthorized(req)) return send(res, 401, { error: 'Token inválido.' });
-          return send(res, 200, api.applyAgentDecision(id, await readJson(req)));
+          return send(res, 200, api.applyAgentDecision(id, await lerCorpo(req)));
         }
         if (sub === '/feedback' && req.method === 'POST') {
-          return send(res, 200, api.setHumanFeedback(id, await readJson(req)));
+          return send(res, 200, api.setHumanFeedback(id, await lerCorpo(req)));
         }
         if (sub) return send(res, 404, { error: 'Rota não encontrada.' });
         if (req.method === 'GET') return send(res, 200, api.getMessage(id));
-        if (req.method === 'PATCH') return send(res, 200, api.updateMessage(id, await readJson(req)));
+        if (req.method === 'PATCH') return send(res, 200, api.updateMessage(id, await lerCorpo(req)));
         if (req.method === 'DELETE') return send(res, 200, api.deleteMessage(id));
       } else {
         if (sub) return send(res, 404, { error: 'Rota não encontrada.' });
         if (req.method === 'GET') return send(res, 200, api.getContact(id));
-        if (req.method === 'PATCH') return send(res, 200, api.updateContact(id, await readJson(req)));
+        if (req.method === 'PATCH') return send(res, 200, api.updateContact(id, await lerCorpo(req)));
         if (req.method === 'DELETE') return send(res, 200, api.deleteContact(id));
       }
     }

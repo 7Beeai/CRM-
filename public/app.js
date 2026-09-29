@@ -27,6 +27,8 @@ async function apiCall(path, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const data = await res.json().catch(() => ({}));
+  // Sessão expirou ou não existe: volta para a tela de login.
+  if (res.status === 401 && data.login) { location.href = '/login'; throw new Error(data.error); }
   if (!res.ok) throw new Error(data.error ?? `Falha na requisição (${res.status})`);
   return data;
 }
@@ -1308,6 +1310,20 @@ for (const [sel, icone] of [
   if (botao) botao.insertAdjacentHTML('afterbegin', icone);
 }
 $('#period-btn').insertAdjacentHTML('beforeend', ICON.chevron);
+
+// Quem está logado aparece no canto; sem login configurado, fica o nome padrão.
+(async () => {
+  try {
+    const eu = await apiCall('/me');
+    if (!eu.usuario) return;
+    $('#user-chip').lastChild.textContent = eu.usuario.nome;
+    $('#user-chip').title = `${eu.usuario.email} · as ações ficam registradas em seu nome`;
+    $('#sair').hidden = false;
+  } catch { /* CRM antigo, sem a rota /me */ }
+})();
+$('#sair').addEventListener('click', async () => {
+  try { await apiCall('/logout', { method: 'POST' }); } finally { location.href = '/login'; }
+});
 $('#header-tag').insertAdjacentHTML('afterbegin', ICON.grid);
 
 // Relógio ao vivo, como no dashboard: 14:05:43 • quarta-feira, 23 de setembro de 2026.

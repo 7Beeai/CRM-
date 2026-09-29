@@ -26,7 +26,9 @@ Variáveis de ambiente:
 | --- | --- | --- |
 | `PORT` | porta do servidor | `3000` |
 | `CRM_DB` | caminho do banco | `data/crm.db` |
-| `CRM_TOKEN` | exige token nas chamadas do agente | vazio (sem token) |
+| `CRM_TOKEN` | exige token nas chamadas do agente; com login ligado, é como o agente entra | vazio (sem token) |
+| `CRM_SESSAO_DIAS` | dias até a sessão de login expirar | `30` |
+| `CRM_COOKIE_SEGURO` | `1` força o cookie de sessão só em HTTPS | automático atrás de proxy HTTPS |
 | `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
 | `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
 | `CRM_ONBOARDING_ALERTA_DIAS` | dias parado até sinalizar a franquia | `7` |
@@ -178,6 +180,9 @@ server/seed.js        dados de exemplo
 server/periodo.js     filtro de período compartilhado
 server/whatsapp.js    conexão com o WhatsApp por QR code e importação de grupos
 server/evolution.js   leitura dos grupos pela Evolution API (sem QR code)
+server/auth.js        login: usuários, senhas (hash) e sessões
+server/usuarios.js    criar e gerenciar usuários pelo terminal (npm run usuario)
+server/pausas.js      pausa do agente por grupo quando a franquia percebe que é robô
 server/importar-grupos.js  importação de uma vez dos grupos de franquia (npm run importar:whatsapp)
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
@@ -231,8 +236,37 @@ O navegador converte o início e o fim do dia local para UTC antes de consultar,
 então "hoje" é o hoje de quem está usando. A API aceita os mesmos filtros nos
 parâmetros `desde` e `ate`, no formato `AAAA-MM-DD HH:MM:SS` em UTC.
 
+## Login
+
+Cada pessoa entra com e-mail e senha. As ações (mover card, responder, avaliar o
+agente) ficam registradas em nome de quem está logado.
+
+O login liga sozinho quando existe o primeiro usuário. Sem nenhum usuário, o CRM
+abre direto, como antes. Os usuários são criados no terminal do servidor, na
+pasta do CRM:
+
+```bash
+npm run usuario -- criar guilherme@7bee.com --nome Guilherme   # pede a senha na hora
+npm run usuario -- senha guilherme@7bee.com                    # troca a senha e derruba as sessões
+npm run usuario -- listar
+npm run usuario -- desativar guilherme@7bee.com
+```
+
+A senha é digitada sem aparecer na tela e fica guardada só como hash. A sessão
+dura 30 dias (`CRM_SESSAO_DIAS`). Oito senhas erradas em 15 minutos bloqueiam
+novas tentativas por 15 minutos.
+
+O agente (n8n) não usa login: ele entra com o `CRM_TOKEN`, no cabeçalho
+`x-crm-token`. Por isso, com o login ligado, defina sempre o `CRM_TOKEN`. Sem o
+token, o n8n também fica de fora.
+
 ## Antes de expor na internet
 
-O sistema nasceu para rodar na rede interna e não tem login. Se for publicar,
-coloque atrás de um proxy com autenticação e defina `CRM_TOKEN` para proteger o
-envio de mensagens.
+- Crie pelo menos um usuário (seção acima), para o login ficar ligado.
+- Defina `CRM_TOKEN`: é com ele que o agente entra.
+- Sirva por HTTPS. Atrás de um proxy que manda `X-Forwarded-Proto: https`, o
+  cookie de sessão já sai marcado como seguro. Sem proxy, use
+  `CRM_COOKIE_SEGURO=1`.
+- A senha do nginx pode continuar como uma segunda camada. Nesse caso, cada
+  pessoa digita duas senhas, e o n8n precisa mandar as duas (ver
+  `docs/agente/FLUXO-N8N.md`).
