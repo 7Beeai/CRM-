@@ -39,7 +39,7 @@ if (!STAGES.some((s) => s.key === etapa)) sair(`Etapa desconhecida: ${etapa}. Us
 const st = await evolution.conectar();
 if (st.fase !== 'conectado') sair(`Evolution: ${st.erro}`);
 
-const grupos = evolution.listarGrupos();
+const grupos = await evolution.listarGrupos();
 const franquias = grupos.filter((g) => passaNoFiltro(g.nome));
 const ignorados = grupos.filter((g) => !passaNoFiltro(g.nome) && new RegExp(configEntrada.filtro, 'i').test(g.nome));
 const novos = franquias.filter((g) => !g.na_esteira);

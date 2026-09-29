@@ -1,6 +1,10 @@
+import { iniciarSessao, tokenAtual, usuarioAtual, sair, trocarSenha, sessaoExpirou } from './sessao.js';
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
-const CS_PADRAO = 'Guilherme';
+// Quem está logado. O servidor grava o ator pelo token; o nome aqui é só para
+// preencher os campos de responsável.
+let CS_PADRAO = '';
 
 const FILAS = {
   precisa: { needs_human: '1' },
@@ -22,11 +26,15 @@ const state = {
 
 async function apiCall(path, options = {}) {
   const res = await fetch(`/api${path}`, {
-    headers: { 'content-type': 'application/json' },
     ...options,
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${tokenAtual()}`, ...(options.headers ?? {}) },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    await sessaoExpirou(data.error);
+    return apiCall(path, options);
+  }
   if (!res.ok) throw new Error(data.error ?? `Falha na requisição (${res.status})`);
   return data;
 }
@@ -1449,5 +1457,52 @@ try {
 } catch { /* navegador sem storage */ }
 atualizarBotaoDoPeriodo();
 
+/* ---------------------------------- sessão --------------------------------- */
+
+function mostrarUsuario(u) {
+  CS_PADRAO = u?.nome ?? '';
+  const chip = $('#user-chip');
+  chip.querySelector('.sb-user__nome')?.remove();
+  chip.insertAdjacentHTML('beforeend', `<span class="sb-user__nome">${esc(u?.nome ?? '…')}</span>`);
+  $('#user-email').textContent = u?.email ?? '';
+}
+
+function alternarMenuDoUsuario(abrir) {
+  const menu = $('#user-menu');
+  const chip = $('#user-chip');
+  const aberto = abrir ?? menu.hidden;
+  menu.hidden = !aberto;
+  chip.setAttribute('aria-expanded', String(aberto));
+}
+
+$('#user-chip').addEventListener('click', () => alternarMenuDoUsuario());
+document.addEventListener('click', (e) => { if (!e.target.closest('#userbox')) alternarMenuDoUsuario(false); });
+$('#user-menu').addEventListener('click', async (e) => {
+  const acao = e.target.closest('[data-user]')?.dataset.user;
+  if (!acao) return;
+  alternarMenuDoUsuario(false);
+  try {
+    if (acao === 'sair') await sair();
+    if (acao === 'senha') {
+      const nova = prompt('Nova senha (mínimo 8 caracteres):');
+      if (nova === null) return;
+      await trocarSenha(nova);
+      toast('Senha trocada.');
+    }
+    if (acao === 'nome') {
+      const nome = prompt('Como você quer aparecer nos cards?', CS_PADRAO);
+      if (nome === null) return;
+      const r = await apiCall('/eu', { method: 'PATCH', body: { nome } });
+      mostrarUsuario({ ...usuarioAtual(), nome: r.nome });
+      toast('Nome atualizado.');
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+});
+document.addEventListener('crm:entrou', (e) => { mostrarUsuario(e.detail); refresh(); });
+
+const usuario = await iniciarSessao();
+mostrarUsuario(usuario);
 refresh();
 setInterval(() => { if (!$('#modal').open) refresh(); }, 60000);

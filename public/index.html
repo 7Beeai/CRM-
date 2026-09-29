@@ -38,7 +38,15 @@
         <span id="theme-label">Tema claro</span>
       </button>
       <button class="sb-btn sb-btn--ghost" id="refresh" type="button">Atualizar</button>
-      <span class="sb-user" id="user-chip" title="As ações ficam registradas em nome de quem opera o CRM">guilherme</span>
+      <div class="sb-userbox" id="userbox">
+        <button class="sb-user" id="user-chip" type="button" title="As ações ficam registradas em nome de quem opera o CRM" aria-haspopup="true" aria-expanded="false"><span class="sb-user__nome">…</span></button>
+        <div class="sb-user__menu" id="user-menu" role="menu" hidden>
+          <div class="sb-user__email" id="user-email"></div>
+          <button class="sb-user__item" type="button" data-user="nome" role="menuitem">Mudar meu nome</button>
+          <button class="sb-user__item" type="button" data-user="senha" role="menuitem">Trocar senha</button>
+          <button class="sb-user__item" type="button" data-user="sair" role="menuitem">Sair</button>
+        </div>
+      </div>
     </div>
     <nav class="sb-nav__links" role="tablist" aria-label="Seções do CRM">
       <button class="sb-nav__link" role="tab" data-view="triagem" aria-current="page">Triagem</button>
@@ -208,6 +216,20 @@
 </dialog>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="login" class="login" aria-labelledby="login-titulo">
+  <form id="login-form" class="login__form" method="dialog" novalidate>
+    <div class="sb-overline"><span class="sb-bee" aria-hidden="true">🐝</span>7Bee.ai · CRM operacional</div>
+    <h2 id="login-titulo">Entrar no CRM</h2>
+    <p class="login__hint">Use o e-mail e a senha da sua conta 7Bee.</p>
+    <label class="login__label" for="login-email">E-mail</label>
+    <input class="sb-field" id="login-email" type="email" autocomplete="username" required />
+    <label class="login__label" for="login-senha">Senha</label>
+    <input class="sb-field" id="login-senha" type="password" autocomplete="current-password" required minlength="8" />
+    <p class="login__erro" id="login-erro" role="alert" hidden></p>
+    <button class="sb-btn sb-btn--primary login__btn" id="login-entrar" type="submit">Entrar</button>
+  </form>
+</dialog>
+
 <script src="/app.js" type="module"></script>
 </body>
 </html>

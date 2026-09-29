@@ -5,27 +5,31 @@ triagem: responde sozinho o que consegue resolver e escala para o CS (Guilherme)
 só o que precisa de gente. O CRM é o painel de controle disso, e também pontua
 cada mensagem por conta própria, para que a fila humana venha na ordem certa.
 
-O núcleo roda **sem dependências**, só com Node.js 22.5 ou superior (usa o
-SQLite nativo). A conexão com o WhatsApp é opcional e é a única parte que pede
-`npm install`.
+O banco é o Postgres do projeto Supabase da 7Bee (schema `crm`) e o login é o
+Supabase Auth. Precisa de Node.js 22.5 ou superior e de `npm install` (driver
+`pg`). A conexão com o WhatsApp por QR code é opcional.
 
 ## Como rodar
 
 ```bash
-npm install     # só para a conexão com o WhatsApp; o resto não precisa
-npm run seed    # opcional: cria dados de exemplo na primeira vez
-npm start       # http://localhost:3000
+npm install
+# aplique supabase/migrations/*.sql no projeto (SQL Editor ou Management API)
+DATABASE_URL=postgresql://… SUPABASE_URL=https://<ref>.supabase.co SUPABASE_ANON_KEY=… npm start
+# http://localhost:3000 — entre com um usuário da equipe (ver "Quem entra")
 ```
 
-O banco fica em `data/crm.db` (arquivo SQLite, fora do Git). Para fazer backup,
-basta copiar esse arquivo.
+O schema fica em [`supabase/migrations/`](supabase/migrations/): um arquivo por
+mudança, aplicado à mão no projeto. Não há migração automática no boot; o
+servidor só confere se `crm.messages` existe e para se não existir.
 
 Variáveis de ambiente:
 
 | Variável | Para quê | Padrão |
 | --- | --- | --- |
 | `PORT` | porta do servidor | `3000` |
-| `CRM_DB` | caminho do banco | `data/crm.db` |
+| `DATABASE_URL` | Postgres do Supabase (pooler em modo session, porta 5432) | obrigatória |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | login pelo Supabase Auth; a anon key vai para o navegador | obrigatórias |
+| `CRM_DB_POOL` | conexões simultâneas com o banco | `4` |
 | `CRM_TOKEN` | exige token nas chamadas do agente | vazio (sem token) |
 | `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
 | `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
@@ -231,8 +235,23 @@ O navegador converte o início e o fim do dia local para UTC antes de consultar,
 então "hoje" é o hoje de quem está usando. A API aceita os mesmos filtros nos
 parâmetros `desde` e `ate`, no formato `AAAA-MM-DD HH:MM:SS` em UTC.
 
-## Antes de expor na internet
+## Quem entra
 
-O sistema nasceu para rodar na rede interna e não tem login. Se for publicar,
-coloque atrás de um proxy com autenticação e defina `CRM_TOKEN` para proteger o
-envio de mensagens.
+O login é o Supabase Auth, com e-mail e senha. Só entra quem está em
+`crm.usuarios` e ativo; a linha nasce sozinha (trigger) quando o usuário é
+criado no Auth, com o nome vindo de `user_metadata.nome`. Esse nome é o ator
+registrado em toda ação e o responsável padrão nos cards: o servidor ignora o
+`actor` que o navegador manda.
+
+Criar alguém da equipe (precisa da service role key, nunca no navegador):
+
+```bash
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/equipe.mjs criar "Nome" email@7bee.ai
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/equipe.mjs listar
+```
+
+A pessoa troca a senha temporária pelo menu do usuário, no canto da barra.
+Desativar alguém: `update crm.usuarios set ativo = false where email = '…'`.
+Deixe o cadastro público desligado no projeto (Auth → Sign up desabilitado).
+
+O agente (n8n) não tem usuário: entra pelo `CRM_TOKEN`, como antes.
