@@ -69,6 +69,11 @@ Para a carga inicial da 7Bee, só três unidades estão começando:
 npm run importar:whatsapp -- --confirmar --etapa=concluido --nova="aracruz|guriri|barra de s[aã]o francisco"
 ```
 
+No banco do Supabase, essa carga já está pronta em
+[`supabase/migrations/20260930000001_carga_franquias_cdt.sql`](../supabase/migrations/20260930000001_carga_franquias_cdt.sql),
+com os 32 grupos lidos da Evolution. Rode no SQL Editor do projeto; rodar de
+novo não duplica.
+
 Franquias que entram direto em Concluído aparecem com o selo **Antes do CRM**.
 Elas contam em Concluídas, mas ficam fora da meta de 5 dias e da média de dias
 até concluir, porque terminaram antes de o CRM medir.
