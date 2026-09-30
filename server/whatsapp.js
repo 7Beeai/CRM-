@@ -14,7 +14,7 @@
 import { rm, access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { db } from './db.js';
+import { all } from './db.js';
 import { fromWhatsappGroup, moveStage, marcarAnteriorAoCrm, STAGES, nomeDaFranquia } from './onboarding.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,16 +87,14 @@ function guardarGrupo(meta) {
 const soDigitos = (jid) => String(jid ?? '').split('@')[0].split(':')[0].replace(/\D/g, '');
 const mesmoNumero = (a, b) => soDigitos(a) && soDigitos(a) === soDigitos(b);
 
-export function jaNaEsteira() {
-  return new Set(
-    db.prepare(`SELECT whatsapp_group_id FROM onboardings WHERE whatsapp_group_id IS NOT NULL`)
-      .all().map((r) => r.whatsapp_group_id)
-  );
+export async function jaNaEsteira() {
+  const rows = await all(`SELECT whatsapp_group_id FROM onboardings WHERE whatsapp_group_id IS NOT NULL`);
+  return new Set(rows.map((r) => r.whatsapp_group_id));
 }
 
-export function listarGrupos() {
+export async function listarGrupos() {
   if (estado.fase !== 'conectado') throw bad('Conecte o WhatsApp antes de listar os grupos.', 409);
-  const naEsteira = jaNaEsteira();
+  const naEsteira = await jaNaEsteira();
   return [...grupos.values()]
     .map((g) => ({ ...g, franquia: nomeDaFranquia(g.nome), na_esteira: naEsteira.has(g.id) }))
     .sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? '') || a.nome.localeCompare(b.nome));
@@ -104,7 +102,7 @@ export function listarGrupos() {
 
 async function entradaAutomatica(meta) {
   const grupo = guardarGrupo(meta);
-  if (grupo) levarGrupoNovo(grupo, 'WhatsApp');
+  if (grupo) await levarGrupoNovo(grupo, 'WhatsApp');
 }
 
 /**
@@ -112,12 +110,12 @@ async function entradaAutomatica(meta) {
  * entrada automática estiver ligada e o nome passar pelo filtro. Serve para as
  * duas conexões (QR code e Evolution).
  */
-export function levarGrupoNovo(grupo, origem = 'WhatsApp') {
+export async function levarGrupoNovo(grupo, origem = 'WhatsApp') {
   if (!AUTO_ENTRADA) return null;
   if (!passaNoFiltro(grupo.nome)) return null;
-  if (jaNaEsteira().has(grupo.id)) return null;
   try {
-    const franquia = fromWhatsappGroup({
+    if ((await jaNaEsteira()).has(grupo.id)) return null;
+    const franquia = await fromWhatsappGroup({
       group_id: grupo.id,
       group_name: grupo.nome,
       created_at: (grupo.criado_em ?? new Date().toISOString()).slice(0, 19).replace('T', ' ')
@@ -234,7 +232,9 @@ export async function conectar() {
     });
 
     // Entrou num grupo novo: vira franquia na esteira.
-    sock.ev.on('groups.upsert', (metas) => { for (const meta of metas) entradaAutomatica(meta); });
+    sock.ev.on('groups.upsert', (metas) => {
+      for (const meta of metas) entradaAutomatica(meta).catch((err) => console.error('WhatsApp: falha na entrada automática:', err.message));
+    });
     sock.ev.on('groups.update', (mudancas) => {
       for (const m of mudancas) if (grupos.has(m.id)) guardarGrupo({ ...grupos.get(m.id), ...m, subject: m.subject ?? grupos.get(m.id).nome });
     });
@@ -296,7 +296,7 @@ export async function importarGrupos(grupos, itens, convitePara, actor) {
   if (itens.length > 500) throw bad('Importe no máximo 500 grupos por vez.');
 
   const etapas = new Set(STAGES.map((s) => s.key));
-  const naEsteira = jaNaEsteira();
+  const naEsteira = await jaNaEsteira();
   const resultado = { criadas: [], ja_existiam: [], erros: [] };
 
   for (const item of itens) {
@@ -307,15 +307,15 @@ export async function importarGrupos(grupos, itens, convitePara, actor) {
     const convite = await convitePara(grupo);
 
     try {
-      const franquia = fromWhatsappGroup({
+      const franquia = await fromWhatsappGroup({
         group_id: grupo.id,
         group_name: grupo.nome,
         group_invite_link: convite,
         created_at: (grupo.criado_em ?? new Date().toISOString()).slice(0, 19).replace('T', ' ')
       });
-      if (etapa !== 'nova') moveStage(franquia.id, etapa, { actor });
+      if (etapa !== 'nova') await moveStage(franquia.id, etapa, { actor });
       // Quem já chega concluído terminou antes do CRM: não entra na conta do bônus.
-      if (etapa === 'concluido') marcarAnteriorAoCrm(franquia.id, { actor });
+      if (etapa === 'concluido') await marcarAnteriorAoCrm(franquia.id, { actor });
       resultado.criadas.push(franquia.franchise_name);
       naEsteira.add(grupo.id);
     } catch (err) {

@@ -103,7 +103,7 @@ export async function lerGrupos() {
     if (!Array.isArray(lista)) throw bad('A Evolution devolveu a lista de grupos num formato inesperado.', 502);
 
     const conhecidos = new Set(grupos.keys());
-    const anterior = lerAjuste(AJUSTE_LEITURA);
+    const anterior = await lerAjuste(AJUSTE_LEITURA);
     const primeiraDoProcesso = !jaLeu;
     grupos.clear();
     const novos = [];
@@ -119,19 +119,19 @@ export async function lerGrupos() {
         novos.push(grupo);
       }
     }
-    for (const grupo of novos) levarGrupoNovo(grupo, 'Evolution');
+    for (const grupo of novos) await levarGrupoNovo(grupo, 'Evolution');
 
     jaLeu = true;
     estado.ultimaLeitura = new Date().toISOString();
-    gravarAjuste(AJUSTE_LEITURA, estado.ultimaLeitura);
+    await gravarAjuste(AJUSTE_LEITURA, estado.ultimaLeitura);
     return grupos.size;
   })();
   try { return await estado.lendo; } finally { estado.lendo = null; }
 }
 
-export function listarGrupos() {
+export async function listarGrupos() {
   if (estado.fase !== 'conectado') throw bad('A leitura da Evolution ainda não terminou.', 409);
-  const naEsteira = jaNaEsteira();
+  const naEsteira = await jaNaEsteira();
   return [...grupos.values()]
     .filter((g) => !g.comunidade)
     .map((g) => ({ ...g, franquia: nomeDaFranquia(g.nome), na_esteira: naEsteira.has(g.id) }))
@@ -252,7 +252,7 @@ export async function receberEvento(corpo) {
     let criadas = 0;
     for (const g of completos) {
       const grupo = guardarGrupo(g);
-      if (grupo && !grupo.comunidade && levarGrupoNovo(grupo, 'Evolution')) criadas += 1;
+      if (grupo && !grupo.comunidade && await levarGrupoNovo(grupo, 'Evolution')) criadas += 1;
     }
     return { ok: true, criadas };
   }

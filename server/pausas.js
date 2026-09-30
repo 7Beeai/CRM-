@@ -10,26 +10,15 @@
  * mensagens do agente e as do Guilherme são iguais ("fromMe"). Para diferenciar,
  * o fluxo registra aqui cada mensagem que o agente envia; uma mensagem do número
  * do Guilherme que não está nessa lista foi escrita por ele.
+ *
+ * As tabelas agent_pausas e agent_envios vêm da migração em supabase/migrations.
  */
-import { db, log } from './db.js';
+import { all, one, run, tx, log } from './db.js';
 import { createMessage, getMessage } from './api.js';
 import { STAGES } from './onboarding.js';
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS agent_pausas (
-  group_id     TEXT PRIMARY KEY,
-  group_name   TEXT NOT NULL DEFAULT '',
-  motivo       TEXT NOT NULL DEFAULT '',
-  trecho       TEXT NOT NULL DEFAULT '',
-  message_id   INTEGER REFERENCES messages(id) ON DELETE SET NULL,
-  pausado_em   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS agent_envios (
-  message_key  TEXT PRIMARY KEY,
-  group_id     TEXT NOT NULL DEFAULT '',
-  enviado_em   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-`);
+// Responsável padrão quando não há usuário logado (agente, importação, seed).
+const CS_PADRAO = process.env.CRM_CS_PADRAO ?? 'Guilherme';
 
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
 const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -39,12 +28,12 @@ const grupoObrigatorio = (id) => {
   return g;
 };
 
-function nomeDoGrupo(groupId) {
-  return db.prepare(`SELECT franchise_name, whatsapp_group_name FROM onboardings WHERE whatsapp_group_id = ?`).get(groupId) ?? null;
+async function nomeDoGrupo(groupId) {
+  return (await one(`SELECT franchise_name, whatsapp_group_name FROM onboardings WHERE whatsapp_group_id = ?`, [groupId])) ?? null;
 }
 
-export function pausaDoGrupo(groupId) {
-  const row = db.prepare(`SELECT * FROM agent_pausas WHERE group_id = ?`).get(grupoObrigatorio(groupId));
+export async function pausaDoGrupo(groupId) {
+  const row = await one(`SELECT * FROM agent_pausas WHERE group_id = ?`, [grupoObrigatorio(groupId)]);
   return row ? { pausado: true, ...row } : { pausado: false, group_id: groupId };
 }
 
@@ -53,14 +42,15 @@ export function pausaDoGrupo(groupId) {
  * franquia da esteira, em que etapa ela está, o que ainda falta e se o agente
  * está pausado ali.
  */
-export function contextoDoGrupo(groupId) {
+export async function contextoDoGrupo(groupId) {
   const g = grupoObrigatorio(groupId);
-  const o = db.prepare(`SELECT * FROM onboardings WHERE whatsapp_group_id = ?`).get(g);
-  const pausa = pausaDoGrupo(g);
+  const o = await one(`SELECT * FROM onboardings WHERE whatsapp_group_id = ?`, [g]);
+  const pausa = await pausaDoGrupo(g);
   if (!o) return { franquia: null, pausado: pausa.pausado, group_id: g };
-  const pendentes = db.prepare(
-    `SELECT title, status, note FROM onboarding_tasks WHERE onboarding_id = ? AND status <> 'feito' ORDER BY position`
-  ).all(o.id);
+  const pendentes = await all(
+    `SELECT title, status, note FROM onboarding_tasks WHERE onboarding_id = ? AND status <> 'feito' ORDER BY position`,
+    [o.id]
+  );
   return {
     group_id: g,
     pausado: pausa.pausado,
@@ -75,11 +65,11 @@ export function contextoDoGrupo(groupId) {
   };
 }
 
-export function listarPausas() {
-  return db.prepare(`
+export async function listarPausas() {
+  return all(`
     SELECT p.*, o.id AS onboarding_id, o.franchise_name, o.whatsapp_group_link
     FROM agent_pausas p LEFT JOIN onboardings o ON o.whatsapp_group_id = p.group_id
-    ORDER BY p.pausado_em DESC`).all();
+    ORDER BY p.pausado_em DESC`);
 }
 
 /**
@@ -88,19 +78,19 @@ export function listarPausas() {
  * avisado com tipo "agente_pausado". Chamar de novo com o grupo já pausado não
  * duplica nada.
  */
-export function pausar(input = {}) {
+export async function pausar(input = {}) {
   const groupId = grupoObrigatorio(input.group_id);
-  const atual = pausaDoGrupo(groupId);
+  const atual = await pausaDoGrupo(groupId);
   if (atual.pausado) return { ...atual, ja_estava_pausado: true };
 
-  const onb = nomeDoGrupo(groupId);
+  const onb = await nomeDoGrupo(groupId);
   const nomeGrupo = input.group_name || onb?.whatsapp_group_name || onb?.franchise_name || groupId;
   const motivo = input.motivo || 'A franquia percebeu que está falando com um robô.';
   const trecho = String(input.texto ?? '').trim();
 
   let mensagem = null;
   if (trecho) {
-    mensagem = createMessage({
+    mensagem = await createMessage({
       body: trecho,
       channel: 'whatsapp',
       sender_name: input.remetente || nomeGrupo,
@@ -118,42 +108,56 @@ export function pausar(input = {}) {
     });
   }
 
-  db.prepare(`INSERT INTO agent_pausas (group_id, group_name, motivo, trecho, message_id, pausado_em) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(groupId, nomeGrupo, motivo, trecho, mensagem?.id ?? null, now());
-  log('agente_pausado', `${nomeGrupo}: ${motivo}`, { messageId: mensagem?.id ?? null, actor: input.agente ?? 'agente-cdt' });
-  avisar({ tipo: 'agente_pausado', grupo: nomeGrupo, group_id: groupId, motivo, texto: trecho, mensagem_id: mensagem?.id ?? null });
-  return { ...pausaDoGrupo(groupId), mensagem: mensagem ? getMessage(mensagem.id) : null };
+  // Duas chamadas ao mesmo tempo: só a primeira grava a pausa e o registro.
+  const gravou = await tx(async (t) => {
+    const r = await t.run(
+      `INSERT INTO agent_pausas (group_id, group_name, motivo, trecho, message_id, pausado_em) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (group_id) DO NOTHING RETURNING group_id`,
+      [groupId, nomeGrupo, motivo, trecho, mensagem?.id ?? null, now()]
+    );
+    if (!r.rowCount) return false;
+    await log('agente_pausado', `${nomeGrupo}: ${motivo}`, { messageId: mensagem?.id ?? null, actor: input.agente ?? 'agente-cdt', t });
+    return true;
+  });
+  if (gravou) {
+    avisar({ tipo: 'agente_pausado', grupo: nomeGrupo, group_id: groupId, motivo, texto: trecho, mensagem_id: mensagem?.id ?? null });
+  }
+  return {
+    ...(await pausaDoGrupo(groupId)),
+    ...(gravou ? {} : { ja_estava_pausado: true }),
+    mensagem: mensagem ? await getMessage(mensagem.id) : null
+  };
 }
 
-export function retomar(groupId, { por = 'Guilherme', motivo = 'reativado pelo CRM' } = {}) {
+export async function retomar(groupId, { por = CS_PADRAO, motivo = 'reativado pelo CRM' } = {}) {
   const g = grupoObrigatorio(groupId);
-  const atual = pausaDoGrupo(g);
+  const atual = await pausaDoGrupo(g);
   if (!atual.pausado) return { retomado: false, pausado: false, group_id: g };
-  db.prepare(`DELETE FROM agent_pausas WHERE group_id = ?`).run(g);
-  log('agente_retomado', `${atual.group_name}: ${motivo}`, { messageId: atual.message_id ?? null, actor: por });
+  await run(`DELETE FROM agent_pausas WHERE group_id = ?`, [g]);
+  await log('agente_retomado', `${atual.group_name}: ${motivo}`, { messageId: atual.message_id ?? null, actor: por });
   return { retomado: true, pausado: false, group_id: g };
 }
 
 /** O fluxo chama a cada mensagem que o agente envia, com o id devolvido pela Evolution. */
-export function registrarEnvio({ message_key, group_id = '' } = {}) {
+export async function registrarEnvio({ message_key, group_id = '' } = {}) {
   const key = String(message_key ?? '').trim();
   if (!key) throw bad('Informe o message_key da mensagem enviada.');
-  db.prepare(`INSERT OR IGNORE INTO agent_envios (message_key, group_id) VALUES (?, ?)`).run(key, String(group_id));
+  await run(`INSERT INTO agent_envios (message_key, group_id) VALUES (?, ?) ON CONFLICT (message_key) DO NOTHING`, [key, String(group_id)]);
   // Guarda só os últimos 90 dias: é o bastante para reconhecer as mensagens do agente.
-  db.prepare(`DELETE FROM agent_envios WHERE enviado_em < datetime('now', '-90 days')`).run();
+  await run(`DELETE FROM agent_envios WHERE enviado_em < now() - interval '90 days'`);
   return { ok: true };
 }
 
-export const foiDoAgente = (key) => Boolean(db.prepare(`SELECT 1 FROM agent_envios WHERE message_key = ?`).get(String(key ?? '')));
+export const foiDoAgente = async (key) => Boolean(await one(`SELECT 1 FROM agent_envios WHERE message_key = ?`, [String(key ?? '')]));
 
 /**
  * O fluxo chama quando aparece no grupo uma mensagem do número do Guilherme.
  * Se não foi o agente que mandou, foi o Guilherme: a pausa do grupo acaba.
  */
-export function mensagemDoGuilherme({ group_id, message_key } = {}) {
+export async function mensagemDoGuilherme({ group_id, message_key } = {}) {
   const g = grupoObrigatorio(group_id);
-  if (foiDoAgente(message_key)) return { do_agente: true, retomado: false, pausado: pausaDoGrupo(g).pausado };
-  const r = retomar(g, { por: 'Guilherme', motivo: 'o Guilherme respondeu no grupo' });
+  if (await foiDoAgente(message_key)) return { do_agente: true, retomado: false, pausado: (await pausaDoGrupo(g)).pausado };
+  const r = await retomar(g, { por: CS_PADRAO, motivo: 'o Guilherme respondeu no grupo' });
   return { do_agente: false, ...r };
 }
 

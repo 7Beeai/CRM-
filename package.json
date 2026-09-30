@@ -12,12 +12,14 @@
     "dev": "node --no-warnings --watch server/index.js",
     "seed": "node --no-warnings server/seed.js",
     "start:simulado": "CRM_WHATSAPP_SIMULADO=1 node --no-warnings server/index.js",
-    "importar:whatsapp": "node --no-warnings server/importar-grupos.js",
-    "usuario": "node --no-warnings server/usuarios.js"
+    "importar:whatsapp": "node --no-warnings server/importar-grupos.js"
   },
   "optionalDependencies": {
     "@whiskeysockets/baileys": "6.7.24",
     "pino": "^9.6.0",
     "qrcode": "1.5.4"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
   }
 }

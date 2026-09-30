@@ -39,5 +39,5 @@ export function foraDoPeriodo(coluna, periodo) {
   const args = [];
   if (periodo.desde) { partes.push(`${coluna} < ?`); args.push(periodo.desde); }
   if (periodo.ate) { partes.push(`${coluna} > ?`); args.push(periodo.ate); }
-  return { sql: partes.length ? ` AND (${partes.join(' OR ')})` : ' AND 0', args };
+  return { sql: partes.length ? ` AND (${partes.join(' OR ')})` : ' AND false', args };
 }

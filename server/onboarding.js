@@ -1,5 +1,8 @@
-import { db, log } from './db.js';
+import { all, one, run, tx, log } from './db.js';
 import { lerPeriodo, filtroPeriodo, foraDoPeriodo } from './periodo.js';
+
+// Responsável padrão quando não há usuário logado (agente, importação, seed).
+const CS_PADRAO = process.env.CRM_CS_PADRAO ?? 'Guilherme';
 
 /**
  * Esteira de onboarding de franquias.
@@ -28,6 +31,9 @@ export const TASK_TEMPLATE = STAGES.slice(1, -1).map((s, i) => ({
 const STAGE_KEYS = STAGES.map((s) => s.key);
 const TASK_STATUSES = ['pendente', 'feito', 'bloqueado'];
 const PARADO_DIAS = Number(process.env.CRM_ONBOARDING_ALERTA_DIAS ?? 7);
+
+// Fora de transação as consultas vão direto no pool; dentro, recebem o `t` do tx().
+const db = { all, one, run };
 
 /* ------------------------------ prazo do onboarding ---------------------------
    Meta do bônus de agilidade do CS: todas as tarefas concluídas em até 5 dias,
@@ -124,14 +130,11 @@ const naoEncontrado = () => Object.assign(new Error('Onboarding não encontrado.
 
 /* ---------------------------------- leitura --------------------------------- */
 
-function tasksOf(id) {
-  return db.prepare(
-    `SELECT * FROM onboarding_tasks WHERE onboarding_id = ? ORDER BY position, id`
-  ).all(id);
+function tasksOf(id, q = db) {
+  return q.all(`SELECT * FROM onboarding_tasks WHERE onboarding_id = ? ORDER BY position, id`, [id]);
 }
 
-function decorate(row) {
-  const tasks = tasksOf(row.id);
+function decorate(row, tasks, agentePausado) {
   const feitas = tasks.filter((t) => t.status === 'feito').length;
   const diasNaEtapa = Math.floor((Date.now() - parse(row.stage_changed_at)) / 8.64e7);
   return {
@@ -146,38 +149,48 @@ function decorate(row) {
     dias_na_etapa: diasNaEtapa,
     parada: row.stage !== 'concluido' && row.situacao === 'ativo' && diasNaEtapa >= PARADO_DIAS,
     prazo: situacaoDoPrazo(row),
-    agente_pausado: agentePausado(row.whatsapp_group_id)
+    agente_pausado: agentePausado
   };
 }
 
-// A tabela de pausas nasce em pausas.js; aqui só se consulta.
-function agentePausado(groupId) {
-  if (!groupId) return false;
-  try {
-    return Boolean(db.prepare(`SELECT 1 FROM agent_pausas WHERE group_id = ?`).get(groupId));
-  } catch {
-    return false;
+// Tarefas e pausas de uma lista inteira em duas consultas, em vez de duas por linha.
+async function decorarTodos(rows) {
+  if (!rows.length) return [];
+  const tarefas = await all(
+    `SELECT * FROM onboarding_tasks WHERE onboarding_id = ANY(?) ORDER BY onboarding_id, position, id`,
+    [rows.map((r) => r.id)]
+  );
+  const porOnboarding = new Map();
+  for (const t of tarefas) {
+    if (!porOnboarding.has(t.onboarding_id)) porOnboarding.set(t.onboarding_id, []);
+    porOnboarding.get(t.onboarding_id).push(t);
   }
+  // A tabela de pausas é escrita em pausas.js; aqui só se consulta.
+  const grupos = rows.map((r) => r.whatsapp_group_id).filter(Boolean);
+  const pausados = new Set(grupos.length
+    ? (await all(`SELECT group_id FROM agent_pausas WHERE group_id = ANY(?)`, [grupos])).map((r) => r.group_id)
+    : []);
+  return rows.map((r) => decorate(r, porOnboarding.get(r.id) ?? [], pausados.has(r.whatsapp_group_id)));
 }
 
-export function listOnboardings({ q = '', stage = '', situacao = 'ativo', desde = '', ate = '' } = {}) {
+export async function listOnboardings({ q = '', stage = '', situacao = 'ativo', desde = '', ate = '' } = {}) {
   const periodo = filtroPeriodo('started_at', lerPeriodo({ desde, ate }));
   let sql = `SELECT * FROM onboardings WHERE 1=1${periodo.sql}`;
   const args = [...periodo.args];
   if (situacao && situacao !== 'todas') { sql += ` AND situacao = ?`; args.push(situacao); }
   if (stage) { sql += ` AND stage = ?`; args.push(stage); }
   if (q) {
-    sql += ` AND (franchise_name LIKE ? OR contact_name LIKE ? OR whatsapp_group_name LIKE ? OR phone LIKE ?)`;
+    sql += ` AND (franchise_name ILIKE ? OR contact_name ILIKE ? OR whatsapp_group_name ILIKE ? OR phone ILIKE ?)`;
     args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   sql += ` ORDER BY stage_changed_at ASC LIMIT 500`;
-  return db.prepare(sql).all(...args).map(decorate);
+  return decorarTodos(await all(sql, args));
 }
 
-export function getOnboarding(id) {
-  const row = db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id);
+export async function getOnboarding(id) {
+  const row = await one(`SELECT * FROM onboardings WHERE id = ?`, [id]);
   if (!row) throw naoEncontrado();
-  return decorate(row);
+  return (await decorarTodos([row]))[0];
 }
 
 /* --------------------------- ligação com os contatos -------------------------- */
@@ -187,56 +200,57 @@ export function getOnboarding(id) {
  * dela chegam já identificadas na triagem. Se já existe contato com o mesmo
  * telefone, reaproveita em vez de duplicar.
  */
-function sincronizarContato(onboarding, { actor = 'sistema' } = {}) {
+async function sincronizarContato(onboarding, { actor = 'sistema', t = db } = {}) {
   const digitos = telefoneEmDigitos(onboarding.phone);
   let contato = onboarding.contact_id
-    ? db.prepare(`SELECT * FROM contacts WHERE id = ?`).get(onboarding.contact_id)
+    ? await t.one(`SELECT * FROM contacts WHERE id = ?`, [onboarding.contact_id])
     : null;
 
   if (!contato && digitos) {
-    contato = db.prepare(`SELECT * FROM contacts WHERE replace(replace(replace(replace(phone,'+',''),'-',''),' ',''),'(','') LIKE ?`)
-      .get(`%${digitos.slice(-11)}%`) ?? null;
+    contato = (await t.one(
+      `SELECT * FROM contacts WHERE replace(replace(replace(replace(phone,'+',''),'-',''),' ',''),'(','') LIKE ?`,
+      [`%${digitos.slice(-11)}%`]
+    )) ?? null;
   }
   if (!contato) {
-    contato = db.prepare(`SELECT * FROM contacts WHERE lower(company) = lower(?)`).get(onboarding.franchise_name) ?? null;
+    contato = (await t.one(`SELECT * FROM contacts WHERE lower(company) = lower(?)`, [onboarding.franchise_name])) ?? null;
   }
 
   const nome = onboarding.contact_name?.trim() || onboarding.franchise_name;
   if (contato) {
-    db.prepare(`UPDATE contacts SET name = ?, company = ?, phone = ?, is_customer = 1,
+    await t.run(`UPDATE contacts SET name = ?, company = ?, phone = ?, is_customer = true,
       owner = CASE WHEN owner = '' THEN ? ELSE owner END,
       tags = CASE WHEN tags LIKE '%franquia%' THEN tags
                   WHEN tags = '' THEN 'franquia'
                   ELSE tags || ', franquia' END,
-      updated_at = ? WHERE id = ?`)
-      .run(nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? '', now(), contato.id);
+      updated_at = ? WHERE id = ?`,
+    [nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? '', now(), contato.id]);
   } else {
-    const info = db.prepare(`
+    const { id } = await t.run(`
       INSERT INTO contacts (name, company, phone, stage, owner, tags, is_customer)
-      VALUES (?, ?, ?, 'cliente', ?, 'franquia', 1)
-    `).run(nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? 'Guilherme');
-    contato = db.prepare(`SELECT * FROM contacts WHERE id = ?`).get(Number(info.lastInsertRowid));
-    log('contato_criado', `${nome} (franquia ${onboarding.franchise_name})`,
-      { contactId: contato.id, onboardingId: onboarding.id, actor });
+      VALUES (?, ?, ?, 'cliente', ?, 'franquia', true) RETURNING id
+    `, [nome, onboarding.franchise_name, onboarding.phone ?? '', onboarding.owner ?? CS_PADRAO]);
+    contato = await t.one(`SELECT * FROM contacts WHERE id = ?`, [id]);
+    await log('contato_criado', `${nome} (franquia ${onboarding.franchise_name})`,
+      { contactId: contato.id, onboardingId: onboarding.id, actor, t });
   }
 
-  db.prepare(`UPDATE onboardings SET contact_id = ?, updated_at = ? WHERE id = ?`)
-    .run(contato.id, now(), onboarding.id);
+  await t.run(`UPDATE onboardings SET contact_id = ?, updated_at = ? WHERE id = ?`, [contato.id, now(), onboarding.id]);
 
   // Mensagens antigas desse telefone passam a apontar para o contato.
   if (digitos) {
     const finalDoNumero = `%${digitos.slice(-8)}`;
-    db.prepare(`UPDATE messages SET contact_id = ?, updated_at = ?
-                WHERE contact_id IS NULL AND sender_handle <> '' AND
-                      replace(replace(replace(replace(sender_handle,'+',''),'-',''),' ',''),'(','') LIKE ?`)
-      .run(contato.id, now(), finalDoNumero);
+    await t.run(`UPDATE messages SET contact_id = ?, updated_at = ?
+                 WHERE contact_id IS NULL AND sender_handle <> '' AND
+                       replace(replace(replace(replace(sender_handle,'+',''),'-',''),' ',''),'(','') LIKE ?`,
+    [contato.id, now(), finalDoNumero]);
   }
   return contato;
 }
 
 /* ---------------------------------- escrita --------------------------------- */
 
-export function createOnboarding(input = {}) {
+export async function createOnboarding(input = {}) {
   const nome = (input.franchise_name ?? '').trim();
   if (!nome) throw bad('O nome da franquia é obrigatório.');
   if (input.started_at !== undefined && input.started_at !== null && input.started_at !== '') {
@@ -248,42 +262,49 @@ export function createOnboarding(input = {}) {
   if (input.stage && !STAGE_KEYS.includes(input.stage)) throw bad('Etapa inválida.');
 
   if (input.whatsapp_group_id) {
-    const existente = db.prepare(`SELECT * FROM onboardings WHERE whatsapp_group_id = ?`)
-      .get(input.whatsapp_group_id);
-    if (existente) return decorate(existente);
+    const existente = await one(`SELECT id FROM onboardings WHERE whatsapp_group_id = ?`, [input.whatsapp_group_id]);
+    if (existente) return getOnboarding(existente.id);
   }
 
-  const info = db.prepare(`
-    INSERT INTO onboardings (franchise_name, contact_name, phone, plan, owner, stage, notes,
-                             origem, whatsapp_group_id, whatsapp_group_name, whatsapp_group_link,
-                             contact_id, started_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    nome, input.contact_name ?? '', input.phone ?? '', input.plan ?? '',
-    input.owner ?? 'Guilherme', input.stage ?? 'nova', input.notes ?? '',
-    input.origem ?? 'manual', input.whatsapp_group_id ?? null,
-    input.whatsapp_group_name ?? '', linkDoGrupo(input.whatsapp_group_link),
-    input.contact_id ?? null, input.started_at ?? now()
-  );
+  const actor = input.actor ?? 'sistema';
+  const id = await tx(async (t) => {
+    // Dois avisos do mesmo grupo podem chegar juntos: só o primeiro cria.
+    const { id } = await t.run(`
+      INSERT INTO onboardings (franchise_name, contact_name, phone, plan, owner, stage, notes,
+                               origem, whatsapp_group_id, whatsapp_group_name, whatsapp_group_link,
+                               contact_id, started_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (whatsapp_group_id) DO NOTHING RETURNING id
+    `, [
+      nome, input.contact_name ?? '', input.phone ?? '', input.plan ?? '',
+      input.owner ?? CS_PADRAO, input.stage ?? 'nova', input.notes ?? '',
+      input.origem ?? 'manual', input.whatsapp_group_id ?? null,
+      input.whatsapp_group_name ?? '', linkDoGrupo(input.whatsapp_group_link),
+      input.contact_id ?? null, input.started_at ?? now()
+    ]);
+    if (!id) return null;
 
-  const id = Number(info.lastInsertRowid);
-  const insert = db.prepare(
-    `INSERT INTO onboarding_tasks (onboarding_id, task_key, title, position) VALUES (?, ?, ?, ?)`
-  );
-  for (const t of TASK_TEMPLATE) insert.run(id, t.task_key, t.title, t.position);
+    for (const task of TASK_TEMPLATE) {
+      await t.run(`INSERT INTO onboarding_tasks (onboarding_id, task_key, title, position) VALUES (?, ?, ?, ?)`,
+        [id, task.task_key, task.title, task.position]);
+    }
+    await log('onboarding_criado', `${nome} (${input.origem ?? 'manual'})`, { onboardingId: id, actor, t });
+    await sincronizarContato(await t.one(`SELECT * FROM onboardings WHERE id = ?`, [id]), { actor, t });
+    return id;
+  });
 
-  log('onboarding_criado', `${nome} (${input.origem ?? 'manual'})`, { onboardingId: id, actor: input.actor ?? 'sistema' });
-  sincronizarContato(db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id), { actor: input.actor ?? 'sistema' });
-  return getOnboarding(id);
+  if (id) return getOnboarding(id);
+  const existente = await one(`SELECT id FROM onboardings WHERE whatsapp_group_id = ?`, [input.whatsapp_group_id]);
+  return getOnboarding(existente.id);
 }
 
-export function updateOnboarding(id, patch = {}) {
-  getOnboarding(id);
+export async function updateOnboarding(id, patch = {}) {
+  await getOnboarding(id);
   const campos = ['franchise_name', 'contact_name', 'phone', 'plan', 'owner', 'notes',
     'whatsapp_group_name', 'whatsapp_group_link', 'situacao', 'started_at'];
   const sets = [];
   const args = [];
-  const atual = db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id);
+  const atual = await one(`SELECT * FROM onboardings WHERE id = ?`, [id]);
   for (const f of campos) {
     if (patch[f] === undefined) continue;
     if (f === 'started_at') {
@@ -311,53 +332,56 @@ export function updateOnboarding(id, patch = {}) {
     args.push(patch[f]);
   }
   if (sets.length) {
-    db.prepare(`UPDATE onboardings SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`).run(...args, now(), id);
-    log('onboarding_atualizado', sets.map((s) => s.split(' =')[0]).join(', '),
-      { onboardingId: id, actor: patch.actor ?? 'sistema' });
-    sincronizarContato(db.prepare(`SELECT * FROM onboardings WHERE id = ?`).get(id),
-      { actor: patch.actor ?? 'sistema' });
+    const actor = patch.actor ?? 'sistema';
+    await tx(async (t) => {
+      await t.run(`UPDATE onboardings SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`, [...args, now(), id]);
+      await log('onboarding_atualizado', sets.map((s) => s.split(' =')[0]).join(', '), { onboardingId: id, actor, t });
+      await sincronizarContato(await t.one(`SELECT * FROM onboardings WHERE id = ?`, [id]), { actor, t });
+    });
   }
   return getOnboarding(id);
 }
 
-export function moveStage(id, stage, { actor = 'sistema' } = {}) {
-  const atual = getOnboarding(id);
+export async function moveStage(id, stage, { actor = 'sistema' } = {}) {
+  const atual = await getOnboarding(id);
   if (!STAGE_KEYS.includes(stage)) throw bad('Etapa inválida.');
   if (stage === atual.stage) return atual;
 
   const destino = STAGE_KEYS.indexOf(stage);
-  // Avançar na esteira marca como feitas as tarefas que ficaram para trás.
-  for (const task of atual.tasks) {
-    const posicao = STAGE_KEYS.indexOf(task.task_key);
-    const deveEstarFeita = posicao < destino;
-    if (deveEstarFeita && task.status === 'pendente') {
-      db.prepare(`UPDATE onboarding_tasks SET status = 'feito', done_at = ?, updated_at = ? WHERE id = ?`)
-        .run(now(), now(), task.id);
+  await tx(async (t) => {
+    // Avançar na esteira marca como feitas as tarefas que ficaram para trás.
+    for (const task of atual.tasks) {
+      const posicao = STAGE_KEYS.indexOf(task.task_key);
+      const deveEstarFeita = posicao < destino;
+      if (deveEstarFeita && task.status === 'pendente') {
+        await t.run(`UPDATE onboarding_tasks SET status = 'feito', done_at = ?, updated_at = ? WHERE id = ?`,
+          [now(), now(), task.id]);
+      }
+      if (!deveEstarFeita && task.status === 'feito') {
+        await t.run(`UPDATE onboarding_tasks SET status = 'pendente', done_at = NULL, updated_at = ? WHERE id = ?`,
+          [now(), task.id]);
+      }
     }
-    if (!deveEstarFeita && task.status === 'feito') {
-      db.prepare(`UPDATE onboarding_tasks SET status = 'pendente', done_at = NULL, updated_at = ? WHERE id = ?`)
-        .run(now(), task.id);
-    }
-  }
 
-  db.prepare(`UPDATE onboardings SET stage = ?, stage_changed_at = ?, concluded_at = ?, updated_at = ? WHERE id = ?`)
-    .run(stage, now(), stage === 'concluido' ? now() : null, now(), id);
+    await t.run(`UPDATE onboardings SET stage = ?, stage_changed_at = ?, concluded_at = ?, updated_at = ? WHERE id = ?`,
+      [stage, now(), stage === 'concluido' ? now() : null, now(), id]);
 
-  const rotulo = STAGES.find((s) => s.key === stage).label;
-  log('onboarding_etapa', `${atual.franchise_name} → ${rotulo}`, { onboardingId: id, actor });
+    const rotulo = STAGES.find((s) => s.key === stage).label;
+    await log('onboarding_etapa', `${atual.franchise_name} → ${rotulo}`, { onboardingId: id, actor, t });
+  });
   return getOnboarding(id);
 }
 
 /** Marca uma franquia importada já concluída: ela fica fora da meta de agilidade. */
-export function marcarAnteriorAoCrm(id, { actor = 'sistema' } = {}) {
-  const atual = getOnboarding(id);
-  db.prepare(`UPDATE onboardings SET fora_da_meta = 1, updated_at = ? WHERE id = ?`).run(now(), id);
-  log('onboarding_meta', `${atual.franchise_name}: concluída antes do CRM, fora da meta de ${PRAZO_DIAS} dias`, { onboardingId: id, actor });
+export async function marcarAnteriorAoCrm(id, { actor = 'sistema' } = {}) {
+  const atual = await getOnboarding(id);
+  await run(`UPDATE onboardings SET fora_da_meta = true, updated_at = ? WHERE id = ?`, [now(), id]);
+  await log('onboarding_meta', `${atual.franchise_name}: concluída antes do CRM, fora da meta de ${PRAZO_DIAS} dias`, { onboardingId: id, actor });
   return getOnboarding(id);
 }
 
-export function setTask(id, taskKey, patch = {}) {
-  const atual = getOnboarding(id);
+export async function setTask(id, taskKey, patch = {}) {
+  const atual = await getOnboarding(id);
   const task = atual.tasks.find((t) => t.task_key === taskKey);
   if (!task) throw Object.assign(new Error('Tarefa não encontrada.'), { status: 404 });
   if (patch.status !== undefined && !TASK_STATUSES.includes(patch.status)) {
@@ -365,33 +389,33 @@ export function setTask(id, taskKey, patch = {}) {
   }
 
   const status = patch.status ?? task.status;
-  db.prepare(`UPDATE onboarding_tasks SET status = ?, note = ?, done_at = ?, updated_at = ? WHERE id = ?`)
-    .run(status, patch.note ?? task.note, status === 'feito' ? (task.done_at ?? now()) : null, now(), task.id);
+  await tx(async (t) => {
+    await t.run(`UPDATE onboarding_tasks SET status = ?, note = ?, done_at = ?, updated_at = ? WHERE id = ?`,
+      [status, patch.note ?? task.note, status === 'feito' ? (task.done_at ?? now()) : null, now(), task.id]);
 
-  log('onboarding_tarefa', `${task.title}: ${status}`, { onboardingId: id, actor: patch.actor ?? 'sistema' });
+    await log('onboarding_tarefa', `${task.title}: ${status}`, { onboardingId: id, actor: patch.actor ?? 'sistema', t });
 
-  // A etapa do card passa a ser a primeira tarefa que ainda falta.
-  const tasks = tasksOf(id);
-  const pendente = tasks.find((t) => t.status !== 'feito');
-  const novaEtapa = pendente ? pendente.task_key : 'concluido';
-  const saiuDaEntrada = atual.stage !== 'nova' || tasks.some((t) => t.status !== 'pendente');
-  if (saiuDaEntrada && novaEtapa !== atual.stage) {
-    db.prepare(`UPDATE onboardings SET stage = ?, stage_changed_at = ?, concluded_at = ?, updated_at = ? WHERE id = ?`)
-      .run(novaEtapa, now(), novaEtapa === 'concluido' ? now() : null, now(), id);
-  }
+    // A etapa do card passa a ser a primeira tarefa que ainda falta.
+    const tasks = await tasksOf(id, t);
+    const pendente = tasks.find((x) => x.status !== 'feito');
+    const novaEtapa = pendente ? pendente.task_key : 'concluido';
+    const saiuDaEntrada = atual.stage !== 'nova' || tasks.some((x) => x.status !== 'pendente');
+    if (saiuDaEntrada && novaEtapa !== atual.stage) {
+      await t.run(`UPDATE onboardings SET stage = ?, stage_changed_at = ?, concluded_at = ?, updated_at = ? WHERE id = ?`,
+        [novaEtapa, now(), novaEtapa === 'concluido' ? now() : null, now(), id]);
+    }
+  });
   return getOnboarding(id);
 }
 
-export function deleteOnboarding(id) {
-  getOnboarding(id);
-  db.prepare(`DELETE FROM onboardings WHERE id = ?`).run(id);
+export async function deleteOnboarding(id) {
+  await getOnboarding(id);
+  await run(`DELETE FROM onboardings WHERE id = ?`, [id]);
   return { ok: true };
 }
 
-export function onboardingActivities(id) {
-  return db.prepare(
-    `SELECT * FROM activities WHERE onboarding_id = ? ORDER BY created_at DESC LIMIT 50`
-  ).all(id);
+export async function onboardingActivities(id) {
+  return all(`SELECT * FROM activities WHERE onboarding_id = ? ORDER BY created_at DESC LIMIT 50`, [id]);
 }
 
 /* --------------------- entrada automática pelo WhatsApp --------------------- */
@@ -400,7 +424,7 @@ export function onboardingActivities(id) {
  * Recebe um grupo novo do WhatsApp do Guilherme e abre o onboarding sozinho.
  * O nome da franquia sai do nome do grupo, já sem os prefixos que o time usa.
  */
-export function fromWhatsappGroup(input = {}) {
+export async function fromWhatsappGroup(input = {}) {
   const groupId = (input.group_id ?? '').trim();
   const groupName = (input.group_name ?? '').trim();
   if (!groupId) throw bad('Envie o group_id do grupo do WhatsApp.');
@@ -414,7 +438,7 @@ export function fromWhatsappGroup(input = {}) {
     contact_name: input.contact_name ?? '',
     phone: input.phone ?? '',
     plan: input.plan ?? '',
-    owner: input.owner ?? 'Guilherme',
+    owner: input.owner ?? CS_PADRAO,
     origem: 'whatsapp',
     started_at: input.created_at ?? now(),
     actor: 'whatsapp'
@@ -432,13 +456,8 @@ export function nomeDaFranquia(groupName) {
     .trim() || groupName.trim();
 }
 
-/** Onboarding ligado a um contato, para a triagem mostrar a franquia e o grupo. */
-export function onboardingDoContato(contactId) {
-  if (!contactId) return null;
-  const row = db.prepare(
-    `SELECT * FROM onboardings WHERE contact_id = ? ORDER BY updated_at DESC LIMIT 1`
-  ).get(contactId);
-  if (!row) return null;
+// O que a triagem mostra de uma franquia no card da mensagem.
+function resumoDoOnboarding(row) {
   const etapa = STAGES.find((s) => s.key === row.stage);
   return {
     id: row.id,
@@ -450,38 +469,56 @@ export function onboardingDoContato(contactId) {
   };
 }
 
+/** Onboarding ligado a um contato, para a triagem mostrar a franquia e o grupo. */
+export async function onboardingDoContato(contactId) {
+  if (!contactId) return null;
+  const row = await one(`SELECT * FROM onboardings WHERE contact_id = ? ORDER BY updated_at DESC LIMIT 1`, [contactId]);
+  return row ? resumoDoOnboarding(row) : null;
+}
+
+/** O mesmo, para uma lista de contatos de uma vez: Map contact_id → resumo. */
+export async function onboardingsDosContatos(contactIds) {
+  const ids = [...new Set(contactIds.filter(Boolean))];
+  const mapa = new Map();
+  if (!ids.length) return mapa;
+  const rows = await all(
+    `SELECT DISTINCT ON (contact_id) * FROM onboardings WHERE contact_id = ANY(?) ORDER BY contact_id, updated_at DESC`,
+    [ids]
+  );
+  for (const row of rows) mapa.set(row.contact_id, resumoDoOnboarding(row));
+  return mapa;
+}
+
 /* -------------------------------- indicadores ------------------------------- */
 
-export function onboardingStats({ desde = '', ate = '' } = {}) {
+export async function onboardingStats({ desde = '', ate = '' } = {}) {
   const p = lerPeriodo({ desde, ate });
   const f = filtroPeriodo('started_at', p);
   const porEtapa = Object.fromEntries(
-    db.prepare(
-      `SELECT stage, COUNT(*) n FROM onboardings WHERE situacao = 'ativo'${f.sql} GROUP BY stage`
-    ).all(...f.args).map((r) => [r.stage, r.n])
+    (await all(`SELECT stage, COUNT(*) n FROM onboardings WHERE situacao = 'ativo'${f.sql} GROUP BY stage`, f.args))
+      .map((r) => [r.stage, r.n])
   );
-  const ativos = listOnboardings({ situacao: 'ativo', desde, ate });
-  const concluidos = db.prepare(
-    `SELECT COUNT(*) n FROM onboardings WHERE stage = 'concluido'${f.sql}`
-  ).get(...f.args).n;
-  const tempoMedio = db.prepare(
-    `SELECT AVG(julianday(concluded_at) - julianday(started_at)) v
-     FROM onboardings WHERE concluded_at IS NOT NULL AND fora_da_meta = 0${f.sql}`
-  ).get(...f.args).v;
+  const ativos = await listOnboardings({ situacao: 'ativo', desde, ate });
+  const concluidos = (await one(`SELECT COUNT(*) n FROM onboardings WHERE stage = 'concluido'${f.sql}`, f.args)).n;
+  const tempoMedio = (await one(
+    `SELECT AVG(extract(epoch from (concluded_at - started_at)) / 86400.0) v
+     FROM onboardings WHERE concluded_at IS NOT NULL AND NOT fora_da_meta${f.sql}`, f.args
+  )).v;
 
   // Franquias ainda em implantação que começaram fora do período escolhido.
   const fora = foraDoPeriodo('started_at', p);
   const emAndamentoFora = p.ativo
-    ? db.prepare(
-      `SELECT COUNT(*) n FROM onboardings WHERE situacao = 'ativo' AND stage <> 'concluido'${fora.sql}`
-    ).get(...fora.args).n
+    ? (await one(
+      `SELECT COUNT(*) n FROM onboardings WHERE situacao = 'ativo' AND stage <> 'concluido'${fora.sql}`, fora.args
+    )).n
     : 0;
 
-  const concluidasNoPeriodo = db.prepare(
-    `SELECT * FROM onboardings WHERE concluded_at IS NOT NULL AND situacao <> 'cancelado' AND fora_da_meta = 0${f.sql}`
-  ).all(...f.args).map((r) => situacaoDoPrazo(r));
+  const concluidasNoPeriodo = (await all(
+    `SELECT * FROM onboardings WHERE concluded_at IS NOT NULL AND situacao <> 'cancelado' AND NOT fora_da_meta${f.sql}`, f.args
+  )).map((r) => situacaoDoPrazo(r));
   const noPrazo = concluidasNoPeriodo.filter((p) => p.dentro).length;
   const emAndamento = ativos.filter((o) => o.stage !== 'concluido');
+  const anterioresAoCrm = (await one(`SELECT COUNT(*) n FROM onboardings WHERE fora_da_meta${f.sql}`, f.args)).n;
 
   return {
     prazo: {
@@ -493,7 +530,7 @@ export function onboardingStats({ desde = '', ate = '' } = {}) {
       taxa_no_prazo: concluidasNoPeriodo.length ? Math.round((noPrazo / concluidasNoPeriodo.length) * 100) : 0,
       em_andamento_estourado: emAndamento.filter((o) => o.prazo.situacao === 'estourado').length,
       em_andamento_vence_logo: emAndamento.filter((o) => o.prazo.situacao === 'vence_logo').length,
-      anteriores_ao_crm: db.prepare(`SELECT COUNT(*) n FROM onboardings WHERE fora_da_meta = 1${f.sql}`).get(...f.args).n
+      anteriores_ao_crm: anterioresAoCrm
     },
     etapas: STAGES.map((s) => ({ ...s, n: porEtapa[s.key] ?? 0 })),
     em_andamento: ativos.filter((o) => o.stage !== 'concluido').length,

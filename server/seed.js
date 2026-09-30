@@ -1,22 +1,22 @@
-import { db } from './db.js';
+import { one, fecharBanco } from './db.js';
 import { createContact, createMessage, applyAgentDecision, setHumanFeedback } from './api.js';
 import { createOnboarding, setTask, moveStage, fromWhatsappGroup } from './onboarding.js';
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3.6e6).toISOString().slice(0, 19).replace('T', ' ');
 
-if (db.prepare(`SELECT COUNT(*) n FROM messages`).get().n > 0) {
+if ((await one(`SELECT COUNT(*) n FROM messages`)).n > 0) {
   console.log('Banco já tem dados. Nada a fazer.');
   process.exit(0);
 }
 
 const contacts = [
-  { name: 'Mariana Lopes', company: 'Docelar Alimentos', email: 'mariana@docelar.com.br', phone: '+5511988887777', stage: 'cliente', owner: 'Guilherme', is_customer: 1, tags: 'plano-pro' },
+  { name: 'Mariana Lopes', company: 'Docelar Alimentos', email: 'mariana@docelar.com.br', phone: '+5511988887777', stage: 'cliente', owner: 'Guilherme', is_customer: true, tags: 'plano-pro' },
   { name: 'Rafael Tavares', company: 'Studio RT', email: 'rafael@studiort.com', phone: '+5521977776666', stage: 'proposta', owner: 'Guilherme', tags: 'inbound' },
-  { name: 'Carla Menezes', company: 'Clínica Vida', email: 'carla@clinicavida.com.br', phone: '+5531966665555', stage: 'cliente', is_customer: 1, tags: 'plano-basico' },
+  { name: 'Carla Menezes', company: 'Clínica Vida', email: 'carla@clinicavida.com.br', phone: '+5531966665555', stage: 'cliente', is_customer: true, tags: 'plano-basico' },
   { name: 'Diego Almeida', company: 'Almeida Log', email: 'diego@almeidalog.com', phone: '+5541955554444', stage: 'lead', tags: 'indicação' },
   { name: 'Patrícia Souza', company: 'PS Consultoria', email: 'patricia@psconsult.com', phone: '+5511944443333', stage: 'qualificado' }
 ];
-for (const c of contacts) createContact(c);
+for (const c of contacts) await createContact(c);
 
 const messages = [
   { sender_name: 'Mariana Lopes', sender_handle: '+5511988887777', channel: 'whatsapp', body: 'Gente, o painel está fora do ar desde cedo e preciso fechar o relatório hoje. É urgente!', received_at: hoursAgo(3) },
@@ -31,7 +31,8 @@ const messages = [
   // ser criado, para mostrar que o vínculo é feito depois.
   { sender_name: 'Jose Martins', sender_handle: '+5511970001111', channel: 'whatsapp', body: 'Travou no cadastro da OpenAI, o cartão foi recusado. Consegue me ajudar hoje?', received_at: hoursAgo(4) }
 ];
-const criadas = messages.map(createMessage);
+const criadas = [];
+for (const m of messages) criadas.push(await createMessage(m));
 
 // Decisões de exemplo, como se o agente já tivesse passado pela fila.
 const decisoes = [
@@ -45,10 +46,10 @@ const decisoes = [
   { i: 7, decision: 'respondeu', confidence: 0.61, intent: 'financeiro', reply: 'Bom dia, João! Já reenviei a nota fiscal e o boleto de agosto para este e-mail.', needs_human: true, reason: 'Confiança baixa: não confirmei se a nota realmente foi emitida.' },
   { i: 8, decision: 'escalou', confidence: 0.9, intent: 'onboarding', reason: 'Franquia travada no cadastro da OpenAI, primeira etapa da esteira.', suggested_reply: 'Oi Jose! Vamos resolver hoje. Consegue tentar outro cartão enquanto eu confirmo o limite internacional?' }
 ];
-for (const d of decisoes) applyAgentDecision(criadas[d.i].id, { agent: 'agente-cs', ...d });
+for (const d of decisoes) await applyAgentDecision(criadas[d.i].id, { agent: 'agente-cs', ...d });
 
-setHumanFeedback(criadas[4].id, { feedback: 'acertou', actor: 'Guilherme' });
-setHumanFeedback(criadas[6].id, { feedback: 'acertou', actor: 'Guilherme' });
+await setHumanFeedback(criadas[4].id, { feedback: 'acertou', actor: 'Guilherme' });
+await setHumanFeedback(criadas[6].id, { feedback: 'acertou', actor: 'Guilherme' });
 
 // Esteira de onboarding
 const diasAtras = (d) => new Date(Date.now() - d * 8.64e7).toISOString().slice(0, 19).replace('T', ' ');
@@ -61,10 +62,11 @@ const franquias = [
   { franchise_name: 'Barbearia do Zé', contact_name: 'Luis Garcez', phone: '+5511970005555', started_at: diasAtras(31) },
   { franchise_name: 'Sorveteria Gelato', contact_name: 'Renata Lima', phone: '+5511970006666', started_at: diasAtras(4) }
 ];
-const abertas = franquias.map((f) => createOnboarding({ ...f, owner: 'Guilherme' }));
+const abertas = [];
+for (const f of franquias) abertas.push(await createOnboarding({ ...f, owner: 'Guilherme' }));
 
 // Uma franquia detectada automaticamente pelo grupo do WhatsApp.
-fromWhatsappGroup({
+await fromWhatsappGroup({
   group_id: '120363000000000001@g.us',
   group_name: '7Bee x Mercado Bom Preço',
   group_invite_link: 'https://chat.whatsapp.com/ExemploMercadoBomPreco',
@@ -72,15 +74,16 @@ fromWhatsappGroup({
   created_at: diasAtras(1)
 });
 
-setTask(abertas[1].id, 'openai', { status: 'feito', actor: 'Guilherme' });
-setTask(abertas[2].id, 'openai', { status: 'feito', actor: 'Guilherme' });
-setTask(abertas[2].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
-setTask(abertas[3].id, 'openai', { status: 'feito', actor: 'Guilherme' });
-setTask(abertas[3].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
-setTask(abertas[3].id, 'ctn', { status: 'bloqueado', note: 'Esperando documento do franqueado.', actor: 'Guilherme' });
-moveStage(abertas[4].id, 'concluido', { actor: 'Guilherme' });
+await setTask(abertas[1].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+await setTask(abertas[2].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+await setTask(abertas[2].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
+await setTask(abertas[3].id, 'openai', { status: 'feito', actor: 'Guilherme' });
+await setTask(abertas[3].id, 'bm_facebook', { status: 'feito', actor: 'Guilherme' });
+await setTask(abertas[3].id, 'ctn', { status: 'bloqueado', note: 'Esperando documento do franqueado.', actor: 'Guilherme' });
+await moveStage(abertas[4].id, 'concluido', { actor: 'Guilherme' });
 // Concluída em 4 dias: dentro do prazo de 5 dias do bônus.
-moveStage(abertas[5].id, 'concluido', { actor: 'Guilherme' });
+await moveStage(abertas[5].id, 'concluido', { actor: 'Guilherme' });
 
 console.log(`Onboarding: ${franquias.length + 1} franquias na esteira.`);
 console.log(`Seed concluído: ${contacts.length} contatos, ${messages.length} mensagens e ${decisoes.length} decisões do agente.`);
+await fecharBanco();

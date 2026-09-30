@@ -5,30 +5,32 @@ triagem: responde sozinho o que consegue resolver e escala para o CS (Guilherme)
 só o que precisa de gente. O CRM é o painel de controle disso, e também pontua
 cada mensagem por conta própria, para que a fila humana venha na ordem certa.
 
-O núcleo roda **sem dependências**, só com Node.js 22.5 ou superior (usa o
-SQLite nativo). A conexão com o WhatsApp é opcional e é a única parte que pede
-`npm install`.
+O banco é o Postgres do projeto Supabase da 7Bee (schema `crm`) e o login é o
+Supabase Auth. Precisa de Node.js 22.5 ou superior e de `npm install` (driver
+`pg`). A conexão com o WhatsApp por QR code é opcional.
 
 ## Como rodar
 
 ```bash
-npm install     # só para a conexão com o WhatsApp; o resto não precisa
-npm run seed    # opcional: cria dados de exemplo na primeira vez
-npm start       # http://localhost:3000
+npm install
+# aplique supabase/migrations/*.sql no projeto (SQL Editor ou Management API)
+DATABASE_URL=postgresql://… SUPABASE_URL=https://<ref>.supabase.co SUPABASE_ANON_KEY=… npm start
+# http://localhost:3000 — entre com um usuário da equipe (ver "Quem entra")
 ```
 
-O banco fica em `data/crm.db` (arquivo SQLite, fora do Git). Para fazer backup,
-basta copiar esse arquivo.
+O schema fica em [`supabase/migrations/`](supabase/migrations/): um arquivo por
+mudança, aplicado à mão no projeto. Não há migração automática no boot; o
+servidor só confere se `crm.messages` existe e para se não existir.
 
 Variáveis de ambiente:
 
 | Variável | Para quê | Padrão |
 | --- | --- | --- |
 | `PORT` | porta do servidor | `3000` |
-| `CRM_DB` | caminho do banco | `data/crm.db` |
-| `CRM_TOKEN` | exige token nas chamadas do agente; com login ligado, é como o agente entra | vazio (sem token) |
-| `CRM_SESSAO_DIAS` | dias até a sessão de login expirar | `30` |
-| `CRM_COOKIE_SEGURO` | `1` força o cookie de sessão só em HTTPS | automático atrás de proxy HTTPS |
+| `DATABASE_URL` | Postgres do Supabase (pooler em modo session, porta 5432) | obrigatória |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | login pelo Supabase Auth; a anon key vai para o navegador | obrigatórias |
+| `CRM_DB_POOL` | conexões simultâneas com o banco | `4` |
+| `CRM_TOKEN` | exige token nas chamadas do agente | vazio (sem token) |
 | `CRM_AGENT_TIMEOUT_MIN` | minutos até avisar que o agente não decidiu | `10` |
 | `CRM_ESCALATION_WEBHOOK` | URL avisada a cada escalonamento | vazio (não avisa) |
 | `CRM_ONBOARDING_ALERTA_DIAS` | dias parado até sinalizar a franquia | `7` |
@@ -180,9 +182,6 @@ server/seed.js        dados de exemplo
 server/periodo.js     filtro de período compartilhado
 server/whatsapp.js    conexão com o WhatsApp por QR code e importação de grupos
 server/evolution.js   leitura dos grupos pela Evolution API (sem QR code)
-server/auth.js        login: usuários, senhas (hash) e sessões
-server/usuarios.js    criar e gerenciar usuários pelo terminal (npm run usuario)
-server/pausas.js      pausa do agente por grupo quando a franquia percebe que é robô
 server/importar-grupos.js  importação de uma vez dos grupos de franquia (npm run importar:whatsapp)
 public/tokens.css     tokens do design (cores, espaço, raios, fontes)
 public/components.css componentes do design (classes sb-*)
@@ -236,37 +235,23 @@ O navegador converte o início e o fim do dia local para UTC antes de consultar,
 então "hoje" é o hoje de quem está usando. A API aceita os mesmos filtros nos
 parâmetros `desde` e `ate`, no formato `AAAA-MM-DD HH:MM:SS` em UTC.
 
-## Login
+## Quem entra
 
-Cada pessoa entra com e-mail e senha. As ações (mover card, responder, avaliar o
-agente) ficam registradas em nome de quem está logado.
+O login é o Supabase Auth, com e-mail e senha. Só entra quem está em
+`crm.usuarios` e ativo; a linha nasce sozinha (trigger) quando o usuário é
+criado no Auth, com o nome vindo de `user_metadata.nome`. Esse nome é o ator
+registrado em toda ação e o responsável padrão nos cards: o servidor ignora o
+`actor` que o navegador manda.
 
-O login liga sozinho quando existe o primeiro usuário. Sem nenhum usuário, o CRM
-abre direto, como antes. Os usuários são criados no terminal do servidor, na
-pasta do CRM:
+Criar alguém da equipe (precisa da service role key, nunca no navegador):
 
 ```bash
-npm run usuario -- criar guilherme@7bee.com --nome Guilherme   # pede a senha na hora
-npm run usuario -- senha guilherme@7bee.com                    # troca a senha e derruba as sessões
-npm run usuario -- listar
-npm run usuario -- desativar guilherme@7bee.com
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/equipe.mjs criar "Nome" email@7bee.ai
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/equipe.mjs listar
 ```
 
-A senha é digitada sem aparecer na tela e fica guardada só como hash. A sessão
-dura 30 dias (`CRM_SESSAO_DIAS`). Oito senhas erradas em 15 minutos bloqueiam
-novas tentativas por 15 minutos.
+A pessoa troca a senha temporária pelo menu do usuário, no canto da barra.
+Desativar alguém: `update crm.usuarios set ativo = false where email = '…'`.
+Deixe o cadastro público desligado no projeto (Auth → Sign up desabilitado).
 
-O agente (n8n) não usa login: ele entra com o `CRM_TOKEN`, no cabeçalho
-`x-crm-token`. Por isso, com o login ligado, defina sempre o `CRM_TOKEN`. Sem o
-token, o n8n também fica de fora.
-
-## Antes de expor na internet
-
-- Crie pelo menos um usuário (seção acima), para o login ficar ligado.
-- Defina `CRM_TOKEN`: é com ele que o agente entra.
-- Sirva por HTTPS. Atrás de um proxy que manda `X-Forwarded-Proto: https`, o
-  cookie de sessão já sai marcado como seguro. Sem proxy, use
-  `CRM_COOKIE_SEGURO=1`.
-- A senha do nginx pode continuar como uma segunda camada. Nesse caso, cada
-  pessoa digita duas senhas, e o n8n precisa mandar as duas (ver
-  `docs/agente/FLUXO-N8N.md`).
+O agente (n8n) não tem usuário: entra pelo `CRM_TOKEN`, como antes.
