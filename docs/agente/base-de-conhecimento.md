@@ -341,12 +341,9 @@ neste arquivo.
   bastante.
 
 ### Qual forma de pagamento a IA usa na baixa manual? ⛔
-> A resposta abaixo citava o gateway, que não é mais usado. Até o Guilherme
-> atualizar, ele mesmo responde.
-
-"DIRETO NO CARTÃO - CEF". Isso só acontece quando o link de conciliação falha e
-o cliente paga pelo caminho antigo, e o dinheiro fica no gateway. A unidade pode
-escolher outra forma de lançamento: é só avisar.
+Cada unidade tem uma forma específica, então o Guilherme sempre responde. Vale
+para qualquer pergunta sobre a forma de pagamento usada nas baixas de uma
+unidade.
 
 ### A IA cobra só o que está em 3C? ✅
 Sim. Ela cobra o que está na lista de inadimplentes do BI. Cobra todas as
